@@ -1,0 +1,11 @@
+[package]
+name = "Distribuida-INE5418"
+version = "0.1.0"
+edition = "2024"
+
+# [workspace]
+# members = [
+#     "remote_file_system"
+# ]
+[dependencies]
+remote_file_system = {path = "remote_file_system"}
