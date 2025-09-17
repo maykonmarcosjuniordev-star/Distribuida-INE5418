@@ -12,18 +12,16 @@ caches de outros processos. Este procedimento é comum na implementação de
 mecanismos para coerência de cache e chama-se invalidação na escrita. É permitida a
 utilização de outras estratégias para coerência de cache.
 */
-
-use crate::server::Server
+use std::net::SocketAddr;
 
 pub struct  Client {
     cache: Vec<u8>,
-    server: Server,
+    server_address: SocketAddr,
 }
 
 impl Client {
-    pub fn new(server: Server) -> Self {
-        let cache = Vec::new();
-        Self {server, cache}
+    pub fn new(server: SocketAddr) -> Self {
+        Self {server_address: server, cache:Vec::new()}
     }
     pub fn abre(&self, descritor_arquivo: i32, nome_arquivo: String) -> i32 {
         if self.cache.len() == 0 {
