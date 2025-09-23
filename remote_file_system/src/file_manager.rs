@@ -54,15 +54,16 @@ impl FileManager {
                     Err(e) => {
                         println!("Erro {} ao abrir arquivo: {}", e, nome_arquivo);
                         return -1;
-                    }                    
+                    }
                 };
                 match  file.read_exact_at(buffer[..tamanho].as_mut(), posicao) {
                     Ok(_) => {
-                        if buffer.len() == tamanho {
-                            tamanho as i32
-                        } else {
-                            buffer.len() as i32
-                        }
+                        buffer.len() as i32
+                        // if buffer.len() == tamanho {
+                        //     tamanho as i32
+                        // } else {
+                        //     buffer.len() as i32
+                        // }
                     }
                     Err(e) => {
                         println!("Erro {} ao abrir arquivo: {}", e, nome_arquivo);
@@ -101,11 +102,12 @@ impl FileManager {
                 };
                 match  file.write_all_at(buffer[..tamanho].as_mut(), posicao) {
                     Ok(_) => {
-                        if buffer.len() == tamanho {
-                            tamanho as i32
-                        } else {
-                            buffer.len() as i32
-                        }
+                        buffer.len()
+                        // if buffer.len() == tamanho {
+                        //     tamanho as i32
+                        // } else {
+                        //     buffer.len() as i32
+                        // }
                     }
                     Err(e) => {
                         println!("Erro {} ao abrir arquivo: {}", e, nome_arquivo);
