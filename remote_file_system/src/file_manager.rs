@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::os::unix::fs::FileExt;
 
 pub struct FileManager {
-    file_table: HashMap<u32, File>,
+    file_table: HashMap<i32, File>,
 }
 
 impl FileManager {
@@ -17,7 +17,7 @@ impl FileManager {
     /// 
     /// ● o valor de retorno inteiro (int) deve representar códigos de erro, na
     /// impossibilidade de execução da operação;
-    pub fn abre(&mut self, descritor_arquivo: u32, nome_arquivo: String) -> i32 {
+    pub fn abre(&mut self, descritor_arquivo: i32, nome_arquivo: String) -> i32 {
         // verify if it is already on the table
         if self.file_table.contains_key(&descritor_arquivo) {
             return 0;
@@ -45,7 +45,7 @@ impl FileManager {
     /// 
     /// ● o valor de retorno inteiro (int) deve representar códigos de erro,
     ///     na impossibilidade de execução da operação.
-    pub fn le(&self, descritor_arquivo: u32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
+    pub fn le(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         match self.file_table.get(&descritor_arquivo) {
             Some(file) => {
                 match  file.read_exact_at(buffer[..tamanho].as_mut(), posicao) {
@@ -77,7 +77,7 @@ impl FileManager {
     /// 
     /// ● o valor de retorno inteiro (int) deve representar códigos de erro,
     ///     na impossibilidade de execução da operação.
-    pub fn escreve(&self, descritor_arquivo: u32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
+    pub fn escreve(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         match self.file_table.get(&descritor_arquivo) {
             Some(file) => {
                 match  file.write_all_at(buffer[..tamanho].as_mut(), posicao) {
@@ -97,7 +97,7 @@ impl FileManager {
     }
     /// ● descritor_arquivo indica o identificador do descritor de arquivo a ser fechado.
     /// Retorna 0 em caso de sucesso e -1 em caso de erro.
-    pub fn fecha(&mut self, descritor_arquivo: u32) -> i32{
+    pub fn fecha(&mut self, descritor_arquivo: i32) -> i32{
         if !self.file_table.contains_key(&descritor_arquivo) {
             return -1;
         }

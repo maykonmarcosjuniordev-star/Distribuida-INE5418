@@ -1,3 +1,4 @@
+pub const BUFFER_SIZE: usize = 1024;
 
 #[repr(u8)]
 pub enum RequestType {
@@ -7,6 +8,7 @@ pub enum RequestType {
     Fecha = 3,
 }
 
+#[repr(u8)]
 pub enum ResponseType {
     Ok = 0,
     AtualizaCache = 1,
@@ -15,7 +17,7 @@ pub enum ResponseType {
 
 pub struct Request {
     pub request_type: RequestType,
-    pub descritor_arquivo: u32,
+    pub descritor_arquivo: i32,
     pub posicao: u64,
     pub size: u32,
     pub data: Vec<u8>,
@@ -44,7 +46,7 @@ impl Request {
                 3 => RequestType::Fecha,
                 _ => panic!("Invalid request type"),
             },
-            descritor_arquivo: u32::from_be_bytes(buffer[1..5].try_into().unwrap()),
+            descritor_arquivo: i32::from_be_bytes(buffer[1..5].try_into().unwrap()),
             posicao: u64::from_be_bytes(buffer[5..13].try_into().unwrap()),
             size: u32::from_be_bytes(buffer[13..17].try_into().unwrap()),
             data: buffer[17..].to_vec(),
@@ -56,7 +58,7 @@ impl Request {
         buffer.extend(&response.descritor_arquivo.to_be_bytes());
         buffer.extend(&response.posicao.to_be_bytes());
         buffer.extend(&response.size.to_be_bytes());
-        buffer.extend(response.data.as_bytes());
+        buffer.extend(response.data);
         buffer
     }
 }
@@ -65,7 +67,7 @@ impl Response {
     pub fn serialize(response: Response) -> Vec<u8> {
         let mut buffer: Vec<u8> = vec![];
         buffer.push(response.response_type as u8);
-        buffer.extend(response.data.as_bytes());
+        buffer.extend(response.data);
         buffer
     }
     pub fn desserialize(buffer: &Vec<u8>) -> Response {

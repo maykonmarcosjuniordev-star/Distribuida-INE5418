@@ -21,16 +21,14 @@ use std::collections::LinkedList;
 use std::net::{SocketAddr, TcpStream};
 use std::io::{Write, Read};
 
-use crate::protocol::{Request, Response, RequestType, ResponseType};
+use crate::protocol::{Request, Response, RequestType, ResponseType, BUFFER_SIZE};
 
 struct CacheItem {
-    descritor_arquivo: u32,
+    descritor_arquivo: i32,
     start: u64,
     end: u64,
     data: Vec<u8>,
 }
-
-const BUFFER_SIZE: usize = 1024; // 1KB
 const MAX_CACHE_SIZE: usize = 1024 * 1024; // 1MB
 
 pub struct  Client {
@@ -49,7 +47,7 @@ impl Client {
     
     /// Envia o buffer para o endereço do servidor
     /// Cria uma stream TCP
-    pub fn send(&self, buffer: Vec<u8>, src: SocketAddr) {
+    fn send(buffer: Vec<u8>, src: SocketAddr) {
         let mut stream = TcpStream::connect(src).unwrap();
         stream.write(&buffer).unwrap();
     }
@@ -60,14 +58,14 @@ impl Client {
         // cria a requisição
         let request = Request {
             request_type: RequestType::Abre,
-            descritor_arquivo: descritor_arquivo as u32,
+            descritor_arquivo: descritor_arquivo,
             posicao: 0,
             size: 0,
-            data: nome_arquivo,            
+            data: nome_arquivo.into_bytes(),
         };
         let buffer = Request::serialize(request);
         // envia a requisição para o servidor
-        self.send(buffer, self.server_address);
+        Self::send(buffer, self.server_address);
         // aguarda a resposta do servidor
         let stream = TcpStream::connect(self.server_address).unwrap();
         let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];
@@ -83,7 +81,7 @@ impl Client {
     pub fn le(&mut self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         // Verifica se o dado está na cache
         for item in self.cache.iter() {
-            if item.descritor_arquivo == descritor_arquivo as u32 && item.start <= posicao && item.end >= posicao + tamanho as u64 {
+            if item.descritor_arquivo == descritor_arquivo && item.start <= posicao && item.end >= posicao + tamanho as u64 {
                 // copia o dado para o buffer
                 let start = (posicao - item.start) as usize;
                 let end = start + tamanho;
@@ -96,14 +94,14 @@ impl Client {
         // cria a requisição
         let request = Request {
             request_type: RequestType::Le,
-            descritor_arquivo: descritor_arquivo as u32,
+            descritor_arquivo: descritor_arquivo,
             posicao,
             size: tamanho as u32,
-            data: String::new(),            
+            data: vec![],
         };
         let buffer = Request::serialize(request);
         // envia a requisição para o servidor
-        self.send(buffer, self.server_address);
+        Self::send(buffer, self.server_address);
         // aguarda a resposta do servidor
         let stream = TcpStream::connect(self.server_address).unwrap();
         let mut buffer: Vec<u8> = vec![0; tamanho + 1];
@@ -114,7 +112,7 @@ impl Client {
             ResponseType::Ok => {
                 // adiciona o dado na cache
                 let cache_item = CacheItem {
-                    descritor_arquivo: descritor_arquivo as u32,
+                    descritor_arquivo: descritor_arquivo,
                     start: posicao,
                     end: posicao + tamanho as u64,
                     data: buffer[1..].to_vec(),
@@ -129,7 +127,7 @@ impl Client {
             },
             ResponseType::AtualizaCache => {
                 // invalida o dado na cache
-                let _ = self.cache.extract_if(|item| item.descritor_arquivo == descritor_arquivo as u32 && item.start >= posicao && item.end <= posicao + tamanho as u64);
+                let _ = self.cache.extract_if(|item| item.descritor_arquivo == descritor_arquivo && item.start >= posicao && item.end <= posicao + tamanho as u64);
                 return -1;
             },
             ResponseType::Erro => {
@@ -144,14 +142,14 @@ impl Client {
         // cria a requisição
         let request = Request {
             request_type: RequestType::Escreve,
-            descritor_arquivo: descritor_arquivo as u32,
+            descritor_arquivo: descritor_arquivo,
             posicao,
             size: tamanho as u32,
-            data: String::from_utf8(buffer[..tamanho].to_vec()).unwrap(),            
+            data: buffer[..tamanho].to_vec(),
         };
         let buffer = Request::serialize(request);
         // envia a requisição para o servidor
-        self.send(buffer, self.server_address);
+        Self::send(buffer, self.server_address);
         // aguarda a resposta do servidor
         let stream = TcpStream::connect(self.server_address).unwrap();
         let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];
@@ -164,17 +162,17 @@ impl Client {
 
     /// Fecha o arquivo no servidor remoto
     /// Retorna 0 se sucesso, -1 se erro
-    pub fn fecha(&mut self, descritor_arquivo: u32) -> i32 {
+    pub fn fecha(&mut self, descritor_arquivo: i32) -> i32 {
         let request = Request {
             request_type: RequestType::Fecha,
-            descritor_arquivo: descritor_arquivo as u32,
+            descritor_arquivo: descritor_arquivo,
             posicao: 0,
             size: 0,
-            data: String::new(),
+            data: vec![],
         };
         let buffer = Request::serialize(request);
         // envia a requisição para o servidor
-        self.send(buffer, self.server_address);
+        Self::send(buffer, self.server_address);
         // aguarda a resposta do servidor
         let stream = TcpStream::connect(self.server_address).unwrap();
         let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];

@@ -3,15 +3,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
 use std::collections::HashMap;
 
 use crate::file_manager::FileManager;
-use crate::protocol::{Request, Response, RequestType, ResponseType};
-
-const BUFFER_SIZE: usize = 1024;
+use crate::protocol::{Request, Response, RequestType, ResponseType, BUFFER_SIZE};
 
 pub struct Server {
     files: FileManager,
     address: SocketAddr,
     /// Map of file descriptors, in each position are the clients using it.
-    file_watchers: HashMap<u32, Vec<SocketAddr>>, 
+    file_watchers: HashMap<i32, Vec<SocketAddr>>, 
 }
 
 impl Server {
@@ -22,35 +20,41 @@ impl Server {
         let file_watchers = HashMap::new();
         Self {files, address, file_watchers}
     }
-
+    
     pub fn get_address(&self) -> SocketAddr {
         self.address
     }
+    
+    /// Envia o buffer para o endereço do cliente
+    /// Creando uma stream TCP
+    fn send(buffer: Vec<u8>, stream: &mut TcpStream) {
+        stream.write(&buffer).unwrap();
+    }
 
     /// Chama o file manager para abrir o arquivo
-    pub fn abre(&mut self, descritor_arquivo: u32,
-                nome_arquivo: String, client: SocketAddr) {
+    pub fn abre(&mut self, descritor_arquivo: i32,
+                nome_arquivo: String, client: &mut TcpStream) {
         match self.files.abre(descritor_arquivo, nome_arquivo) {
             0 => {
                 let usr = self.file_watchers.get_mut(&descritor_arquivo);
                 match usr {
-                    Some(u) => u.push(client),
+                    Some(u) => u.push(client.peer_addr().unwrap()),
                     None => {
-                        self.file_watchers.insert(descritor_arquivo, vec![client]);
+                        self.file_watchers.insert(descritor_arquivo, vec![client.peer_addr().unwrap()]);
                     }
                 }
             },
             i => {
-                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
                 let buffer = Response::serialize(resp);
-                self.send(buffer, client);
+                Self::send(buffer, client);
             },
         }
     }
 
     /// Chama o file manager para ler o arquivo e envia o buffer para o cliente
-    pub fn le(&self, descritor_arquivo: u32, posicao: u64,
-                tamanho: usize, client: SocketAddr) {
+    pub fn le(&self, descritor_arquivo: i32, posicao: u64,
+                tamanho: usize, client: &mut TcpStream) {
         let mut info: Vec<u8> = vec![0; BUFFER_SIZE];
         // Verifica se o arquivo está aberto por algum cliente
         if !self.file_watchers.contains_key(&descritor_arquivo) {
@@ -61,75 +65,75 @@ impl Server {
             0 => {
                 let resp = Response {response_type: ResponseType::Ok, data: info};
                 let buffer = Response::serialize(resp);
-                self.send(buffer, client);
+                Self::send(buffer, client);
             },
             i => {
                 println!("Error reading file: {}", i);
-                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
                 let buffer = Response::serialize(resp);
-                self.send(buffer, client);
+                Self::send(buffer, client);
             }
         }
     }
 
     /// Chama o file manager para escrever no arquivo.
     /// Invalida os caches dos outros clientes que possuem o arquivo aberto
-    pub fn escreve(&self, descritor_arquivo: u32, posicao: u64,
+    pub fn escreve(&mut self, descritor_arquivo: i32, posicao: u64,
                     buffer: &mut Vec<u8>, tamanho: usize,
-                    client: SocketAddr) {
+                    client: &mut TcpStream) {
         match self.files.escreve(descritor_arquivo, posicao, buffer, tamanho) {
             0 => {
                 let usrs = self.file_watchers
-                    .get_mut(&descritor_arquivo)
+                    .get(&descritor_arquivo)
                     .expect("shouldn't happen");
+                let addr = client.peer_addr().unwrap();
                 for usr in usrs {
-                    if *usr != client {
+                    if *usr != addr {
                         let response = Response {
                             response_type: ResponseType::AtualizaCache,
-                            data: to_be_bytes(descritor_arquivo),
+                            data: descritor_arquivo.to_be_bytes().to_vec(),
                         };
                         let buffer = Response::serialize(response);
-                        self.send(buffer, *usr);
+                        let mut stream = TcpStream::connect(usr).unwrap();
+                        Self::send(buffer, &mut stream);
                     }
                 }
-                usrs.retain(|&x| x == cliente);
+                // mantém apenas o cliente que fez a escrita na lista de usuários
+                self.file_watchers
+                    .get_mut(&descritor_arquivo)
+                    .expect("File not found")
+                    .retain(|&x| x == addr);
             },
             i => {
-                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
                 let buffer = Response::serialize(resp);
-                self.send(buffer, client);
+                Self::send(buffer, client);
             },
         }
     }
 
     /// Chama o file manager para fechar o arquivo
     /// Remove o cliente da lista de usuários do arquivo
-    pub fn fecha(&mut self, descritor_arquivo: u32, client: SocketAddr) {
+    pub fn fecha(&mut self, descritor_arquivo: i32, client: &mut TcpStream) {
         match self.files.fecha(descritor_arquivo) {
             0 => {
+                let addr = client.peer_addr().unwrap();
                 self.file_watchers
                     .get_mut(&descritor_arquivo)
                     .expect("File not found")
-                    .retain(|&x| x != client);
-                
+                    .retain(|&x| x != addr);
+
             },
             i => {
-                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
                 let buffer = Response::serialize(resp);
-                self.send(buffer, client);
+                Self::send(buffer, client);
             },
         }
 
     }
 
-    /// Envia o buffer para o endereço do cliente
-    /// Creando uma stream TCP
-    pub fn send(&self, buffer: Vec<u8>, src: SocketAddr) {
-        let mut stream = TcpStream::connect(src).unwrap();
-        stream.write(&buffer).unwrap();
-    }
-
-    pub fn main(&mut self) {
+    pub fn run(&mut self) {
         let listener = TcpListener::bind(self.address).unwrap();
         for stream in listener.incoming() {
             match stream {
@@ -146,19 +150,19 @@ impl Server {
                         buffer_vect.push(buffer_socket[i].clone());
                     }
         
-                    let func_result = match requisito.request_type {
+                    match requisito.request_type {
                         RequestType::Abre => {
-                            self.abre(requisito.descritor_arquivo, String::from_utf8(requisito.data).unwrap(), current_client);
+                            self.abre(requisito.descritor_arquivo, String::from_utf8(requisito.data).unwrap(), &mut stream);
                         },
                         RequestType::Le => {
-                            self.le(requisito.descritor_arquivo, requisito.posicao, requisito.size as usize, current_client);
+                            self.le(requisito.descritor_arquivo, requisito.posicao, requisito.size as usize, &mut stream);
                         },
                         RequestType::Escreve => {
-                            let mut buffer = requisito.data.as_bytes().to_vec();
-                            self.escreve(requisito.descritor_arquivo, requisito.posicao, &mut buffer, requisito.size as usize, current_client);
+                            let mut buffer = requisito.data;
+                            self.escreve(requisito.descritor_arquivo, requisito.posicao, &mut buffer, requisito.size as usize, &mut stream);
                         },
                         RequestType::Fecha => {
-                            self.fecha(requisito.descritor_arquivo, current_client);
+                            self.fecha(requisito.descritor_arquivo, &mut stream);
                         }
                     };
                 }
