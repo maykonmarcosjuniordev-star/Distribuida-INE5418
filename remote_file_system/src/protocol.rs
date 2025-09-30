@@ -1,6 +1,7 @@
 pub const BUFFER_SIZE: usize = 1024;
 
 #[repr(u8)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RequestType {
     Abre = 0,
     Le = 1,
@@ -9,12 +10,14 @@ pub enum RequestType {
 }
 
 #[repr(u8)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResponseType {
     Ok = 0,
     AtualizaCache = 1,
     Erro = 2,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Request {
     pub request_type: RequestType,
     pub descritor_arquivo: i32,
@@ -23,6 +26,7 @@ pub struct Request {
     pub data: Vec<u8>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Response {
     /// 1 -> Atualiza cache dos clientes devido a write
     pub response_type: ResponseType,

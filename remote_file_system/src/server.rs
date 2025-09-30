@@ -89,9 +89,12 @@ impl Server {
                 let addr = client.peer_addr().unwrap();
                 for usr in usrs {
                     if *usr != addr {
+                        let mut data = descritor_arquivo.to_be_bytes().to_vec();
+                        data.extend(posicao.to_be_bytes().to_vec());
+                        data.extend((tamanho as u64).to_be_bytes().to_vec());
                         let response = Response {
                             response_type: ResponseType::AtualizaCache,
-                            data: descritor_arquivo.to_be_bytes().to_vec(),
+                            data,
                         };
                         let buffer = Response::serialize(response);
                         let mut stream = TcpStream::connect(usr).unwrap();
