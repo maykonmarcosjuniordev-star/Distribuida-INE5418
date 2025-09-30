@@ -18,13 +18,13 @@ pub struct Request {
     pub descritor_arquivo: u32,
     pub posicao: u64,
     pub size: u32,
-    pub data: String,
+    pub data: Vec<u8>,
 }
 
 pub struct Response {
     /// 1 -> Atualiza cache dos clientes devido a write
     pub response_type: ResponseType,
-    pub data: String,
+    pub data: Vec<u8>,
 }
 
 impl Request {
@@ -47,7 +47,7 @@ impl Request {
             descritor_arquivo: u32::from_be_bytes(buffer[1..5].try_into().unwrap()),
             posicao: u64::from_be_bytes(buffer[5..13].try_into().unwrap()),
             size: u32::from_be_bytes(buffer[13..17].try_into().unwrap()),
-            data: String::from_utf8(buffer[17..].to_vec()).unwrap(),
+            data: buffer[17..].to_vec(),
         }
     }
     pub fn serialize(response: Request) -> Vec<u8> {
@@ -76,7 +76,7 @@ impl Response {
                 2 => ResponseType::Erro,
                 _ => panic!("Invalid response type"),
             },
-            data: String::from_utf8(buffer[1..].to_vec()).unwrap(),
+            data: buffer[1..].to_vec(),
         }
     }
 }

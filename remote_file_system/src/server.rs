@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use crate::file_manager::FileManager;
 use crate::protocol::{Request, Response, RequestType, ResponseType};
 
+const BUFFER_SIZE: usize = 1024;
+
 pub struct Server {
     files: FileManager,
     address: SocketAddr,
@@ -27,7 +29,7 @@ impl Server {
 
     /// Chama o file manager para abrir o arquivo
     pub fn abre(&mut self, descritor_arquivo: u32,
-                nome_arquivo: String, client: SocketAddr) -> i32 {
+                nome_arquivo: String, client: SocketAddr) {
         match self.files.abre(descritor_arquivo, nome_arquivo) {
             0 => {
                 let usr = self.file_watchers.get_mut(&descritor_arquivo);
@@ -37,28 +39,35 @@ impl Server {
                         self.file_watchers.insert(descritor_arquivo, vec![client]);
                     }
                 }
-                0
-            }
-            i => {i}
+            },
+            i => {
+                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let buffer = Response::serialize(resp);
+                self.send(buffer, client);
+            },
         }
     }
 
     /// Chama o file manager para ler o arquivo e envia o buffer para o cliente
     pub fn le(&self, descritor_arquivo: u32, posicao: u64,
                 tamanho: usize, client: SocketAddr) {
-        let mut buffer: Vec<u8> = vec![0; tamanho];
+        let mut info: Vec<u8> = vec![0; BUFFER_SIZE];
         // Verifica se o arquivo está aberto por algum cliente
         if !self.file_watchers.contains_key(&descritor_arquivo) {
             println!("File not opened by any client");
             return;
         }
-        match self.files.le(descritor_arquivo, posicao, &mut buffer, tamanho) {
+        match self.files.le(descritor_arquivo, posicao, &mut info, tamanho) {
             0 => {
+                let resp = Response {response_type: ResponseType::Ok, data: info};
+                let buffer = Response::serialize(resp);
                 self.send(buffer, client);
             },
             i => {
                 println!("Error reading file: {}", i);
-                return;
+                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let buffer = Response::serialize(resp);
+                self.send(buffer, client);
             }
         }
     }
@@ -67,46 +76,50 @@ impl Server {
     /// Invalida os caches dos outros clientes que possuem o arquivo aberto
     pub fn escreve(&self, descritor_arquivo: u32, posicao: u64,
                     buffer: &mut Vec<u8>, tamanho: usize,
-                    client: SocketAddr) -> i32 {
+                    client: SocketAddr) {
         match self.files.escreve(descritor_arquivo, posicao, buffer, tamanho) {
             0 => {
                 let usrs = self.file_watchers
-                    .get(&descritor_arquivo)
+                    .get_mut(&descritor_arquivo)
                     .expect("shouldn't happen");
                 for usr in usrs {
                     if *usr != client {
                         let response = Response {
                             response_type: ResponseType::AtualizaCache,
-                            data: descritor_arquivo.to_string(),
+                            data: to_be_bytes(descritor_arquivo),
                         };
                         let buffer = Response::serialize(response);
                         self.send(buffer, *usr);
                     }
                 }
-                return 0;
+                usrs.retain(|&x| x == cliente);
             },
             i => {
-                return i;
+                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let buffer = Response::serialize(resp);
+                self.send(buffer, client);
             },
         }
     }
 
     /// Chama o file manager para fechar o arquivo
     /// Remove o cliente da lista de usuários do arquivo
-    pub fn fecha(&mut self, descritor_arquivo: u32, client: SocketAddr) -> i32 {
+    pub fn fecha(&mut self, descritor_arquivo: u32, client: SocketAddr) {
         match self.files.fecha(descritor_arquivo) {
             0 => {
                 self.file_watchers
                     .get_mut(&descritor_arquivo)
                     .expect("File not found")
                     .retain(|&x| x != client);
-                0
+                
             },
             i => {
-                return i;
+                let resp = Response {response_type: ResponseType::Erro, data: vec![i]};
+                let buffer = Response::serialize(resp);
+                self.send(buffer, client);
             },
         }
-    
+
     }
 
     /// Envia o buffer para o endereço do cliente
@@ -133,9 +146,9 @@ impl Server {
                         buffer_vect.push(buffer_socket[i].clone());
                     }
         
-                    match requisito.request_type {
+                    let func_result = match requisito.request_type {
                         RequestType::Abre => {
-                            self.abre(requisito.descritor_arquivo, requisito.data, current_client);
+                            self.abre(requisito.descritor_arquivo, String::from_utf8(requisito.data).unwrap(), current_client);
                         },
                         RequestType::Le => {
                             self.le(requisito.descritor_arquivo, requisito.posicao, requisito.size as usize, current_client);
