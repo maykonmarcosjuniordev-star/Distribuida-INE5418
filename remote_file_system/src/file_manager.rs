@@ -1,5 +1,4 @@
 use std::fs::{File, OpenOptions};
-// use std::io::Read;
 use std::collections::HashMap;
 use std::os::unix::fs::FileExt;
 
@@ -97,13 +96,18 @@ impl FileManager {
         }
     }
     /// ● descritor_arquivo indica o identificador do descritor de arquivo a ser fechado.
-    pub fn fecha(&self, descritor_arquivo: u32) -> i32{
+    /// Retorna 0 em caso de sucesso e -1 em caso de erro.
+    pub fn fecha(&mut self, descritor_arquivo: u32) -> i32{
         if !self.file_table.contains_key(&descritor_arquivo) {
             return -1;
         }
-        let file = self.file_table.get(&descritor_arquivo).expect("shouldn't happen");
         // fecha o arquivo
-        drop(file);
-        0
+        match self.file_table.remove(&descritor_arquivo) {
+            Some(f) => {
+                drop(f);
+                0
+            },
+            None => -1,
+        }
     }
 }
