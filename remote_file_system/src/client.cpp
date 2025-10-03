@@ -1,9 +1,10 @@
 #include <sys/socket.h>
+#include <vector>
 
 using namespace std;
 
 
-const int MAX_CACHE_SIZE = 1024 * 1024;
+const int MAX_CACHE_SIZE = 1024;
 const int BUFFER_SIZE = 1024;
 
 struct {
@@ -25,10 +26,8 @@ struct Request {
     int descritor_arquivo;
     int posicao;
     int size;
-    char data[];
+    vector<char> data;
 };
-
-
 
 enum ResponseType {
     OK,
@@ -38,7 +37,7 @@ enum ResponseType {
 
 struct Response {
     ResponseType response_type;
-    char data[];
+    vector<char> data;
 };
 
 
@@ -48,11 +47,14 @@ public:
     struct sockaddr_in server_address;
     int socket;
 
-    sockaddr_in get_server_address(self) {
-        return server_address;
+    void setup() {
+        socket = socket(AF_INET, SOCK_STREAM, 0);
+        server_address.sun_family = AF_INET;
+        server_address.sin_port = htons(8080); // E a porta?
+        server_address.sin_addr.s_addr = inet_addr("127.0.0.1"); // Como fazer o IP do servidor?
     }
 
-    int send(char buffer[]) {
+    int sendServer(vector<char> buffer, Request rqst) {
         int result;
         int len = sizeof(server_address);
         result = connect(socket, (struct sockaddr *)&server_address, len);
@@ -60,19 +62,11 @@ public:
             perror("AAAAAAAAAAAAAAAAAAAAAAAAA"); // TODO
             return -1;
         }
-        len = buffer.len();
 
-        write(socket, &buffer, len);
+        write(socket, &rqst, sizeof(rqst));
         read(socket, &buffer, len);
 
         close(socket);
-    }
-
-    void setup() {
-        socket = socket(AF_INET, SOCK_STREAM, 0);
-        server_address.sun_family = AF_INET;
-        server_address.sin_port = htons(8080); // E a porta?
-        server_address.sin_addr.s_addr = inet_addr("127.0.0.1"); // Como fazer o IP do servidor?
     }
 
     int abre(int descritor_arquivo, string nome_arquivo) {
@@ -85,8 +79,7 @@ public:
         
         
         char buffer[BUFFER_SIZE];
-        buffer = serialize(rqst);
-        send(buffer);
+        sendServer(buffer, rqst);
 
         Response rsp = desserialize(buffer);
         return rsp.response_type;
@@ -98,18 +91,17 @@ public:
         rqst.descritor_arquivo = descritor_arquivo;
         rqst.posicao = 0;
         rqst.size = 0;
-        rqst.data = [];
+        rqst.data = {}; // TODO check
         
         
         char buffer[BUFFER_SIZE];
-        buffer = serialize(rqst);
-        send(buffer);
+        sendServer(buffer, rqst);
+
         Response rsp = desserialize(buffer);
-        
         return rsp.response_type;
     }
 
-    int escreve(int descritor_arquivo, int posicao, char[] buffer, int tamanho) {
+    int escreve(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, int tamanho) {
         Request rqst;
         rqst.request_type = RequestType::ESCREVE;
         rqst.descritor_arquivo = descritor_arquivo;
@@ -119,171 +111,158 @@ public:
         
         
         char buffer[BUFFER_SIZE];
-        buffer = serialize(rqst);
-        send(buffer);
-        Response rsp = desserialize(buffer);
+        sendServer(buffer, rqst);
         
+        Response rsp = desserialize(buffer);
         return rsp.response_type;
     }
 
-    void verify_cache() {
-        
+    int le(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, int tamanho) {
+        for (auto item : cache) {
+            if (item.descritor_arquivo == descritor_arquivo and item.start <= posicao and posicao+tamanho <= item.end) {
+                int cacheStatus = verify_cache();
+                if (cacheStatus) {
+                    int start = posicao - item.start;
+                    int end = start+tamanho;
+                    buffer = item.data[start..end];
+                    return tamanho;
+                } else {
+                    // Remove item from cache?
+                }
+            }
+        }
+
+        Request rqst;
+        rqst.request_type = RequestType::LE;
+        rqst.descritor_arquivo = descritor_arquivo;
+        rqst.posicao = posicao;
+        rqst.size = tamanho;
+        rqst.data = {};
+
+        sendServer(buffer, rqst);
+
+        Response rsp = desserialize(buffer);
+
+        if (rsp.response_type == ResponseType::OK) {
+            CacheItem item;
+            item.descritor_arquivo = descritor_arquivo;
+            item.start = posicao;
+            item.end = posicao+tamanho;
+            item.data = rsp.data;
+            cache.push_back(item);
+            if (cache.size() > MAX_CACHE_SIZE) {
+                cache.erase(cache.begin()); // TODO: change to better structure, since this is O(N)
+            }
+            return tamanho;
+        } else { // ERROR
+            return -1;
+        }
     }
 
 
-    void serialize() {} // TODO
-    void desserialize() {} // TODO
+    void verify_cache() {
+        int result;
+        char buffer[BUFFER_SIZE];
+        result = connect(socket, (struct sockaddr *)&server_address, len);
+        if (result == -1) {
+            perror("AAAAAAAAAAAAAAAAAAAAAAAAA"); // TODO
+            return -1;
+        }
+
+
+        result = recv(socket, &buffer, len, PEEK);
+
+        if (result) {
+            read(socket, &buffer, len);
+            Response rsp = desserialize(buffer);
+            if (rsp.response_type == CACHE_UPDATE) {
+                vector<char> data = rsp.data;
+                int descriptor = data[0..4] // TODO how to desserialize
+                int posicao = data[4..12] // TODO how to desserialize
+                int sizee = data[12..20] // TODO how to desserialize
+                for (auto item : cache) {
+                    remove if item.descritor_arquivo == descriptor
+                                        && item.start >= pos
+                                        && item.end <= pos + ssize);
+                }
+            }
+        }
+    }
+
+
+
+    int serialize(Request &rqst) {
+        int32_t byte0 = htonl(rqst.request_type);
+        int32_t byte4 = htonl(rqst.descritor_arquivo);
+        int32_t byte8 = htonl(rqst.posicao);
+        int32_t byte12 = htonl(rqst.size);
+        int32_t byte16e = htonl((int32_t)rqst.data.size());
+    }
 }
 
-
-// impl Client {
-//     fn verify_cache(&mut self) {
-//         // checa se a cache não está inválida
-//         let listener = TcpListener::bind(server_address).unwrap();
-//         for stream in listener.incoming() {
-//             let mut stream = stream.unwrap();
-//             let mut temp_buffer: Vec<u8> = vec![0; BUFFER_SIZE];
-//             stream.read(&mut temp_buffer).unwrap();
-//             let response = Response::desserialize(&temp_buffer);
-//             if response.response_type == ResponseType::AtualizaCache {
-//                 // invalida o dado na cache
-//                 let data = response.data;
-//                 let descriptor = i32::from_be_bytes(data[0..4].try_into().unwrap());
-//                 let pos = u64::from_be_bytes(data[4..12].try_into().unwrap());
-//                 let ssize = u64::from_be_bytes(data[12..20].try_into().unwrap());
-//                 let _ = cache.extract_if(|item|
-//                                         item.descritor_arquivo == descriptor
-//                                         && item.start >= pos
-//                                         && item.end <= pos + ssize);
-//             }
-//         }
-//     }
-    
-//     pub fn le(&mut self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
-//         // Verifica se o dado está na cache
-//         let mut item_opt: Option<CacheItem> = None;
-//         for item in &cache {
-//             if item.descritor_arquivo == descritor_arquivo && item.start <= posicao && item.end >= posicao + tamanho as u64 {
-//                 item_opt = Some(item.clone());
-//                 break;
-//             }
-//         }
-//         if !item_opt.is_none() {
-//             // checa se a cache não está inválida
-//             verify_cache();
-//             // se ainda está na cache, lê dela
-//             let start = (posicao - item_opt.as_ref().unwrap().start) as usize;
-//             let end = start + tamanho;
-//             // copia o dado para o buffer
-//             buffer.extend(&item_opt.as_ref().unwrap().data[start..end]);
-//             // retorna o número de bytes lidos
-//             return tamanho as i32;
-//         }
-//         // não encontrou na cache
-//         // cria a requisição
-//         let request = Request {
-//             request_type: RequestType::Le,
-//             descritor_arquivo,
-//             posicao,
-//             size: tamanho as u32,
-//             data: vec![],
-//         };
-//         let buffer = Request::serialize(request);
-//         // envia a requisição para o servidor
-//         Self::send(buffer, server_address);
-//         // aguarda a resposta do servidor
-//         let stream = TcpStream::connect(server_address).unwrap();
-//         let mut buffer: Vec<u8> = vec![0; tamanho + 1];
-//         stream.take((tamanho + 1) as u64).read(&mut buffer).unwrap();
-//         // desserializa a resposta
-//         let response = Response::desserialize(&buffer);
-//         match response.response_type {
-//             ResponseType::Ok => {
-//                 // adiciona o dado na cache
-//                 let cache_item = CacheItem {
-//                     descritor_arquivo: descritor_arquivo,
-//                     start: posicao,
-//                     end: posicao + tamanho as u64,
-//                     data: buffer[1..].to_vec(),
-//                 };
-//                 cache.push_back(cache_item);
-//                 // verifica se a cache está maior que o tamanho máximo
-//                 while cache.len() > MAX_CACHE_SIZE {
-//                     cache.pop_front();
-//                 }
-//                 // retorna o número de bytes lidos
-//                 return tamanho as i32;
-//             },
-//             ResponseType::AtualizaCache => {
-//                 // invalida o dado na cache
-//                 let _ = cache.extract_if(|item| item.descritor_arquivo == descritor_arquivo && item.start >= posicao && item.end <= posicao + tamanho as u64);
-//                 return -1;
-//             },
-//             ResponseType::Erro => {
-//                 return -1;
-//             },
-//         }
-//     }
-  
-// }
+    RequestType request_type;
+    int descritor_arquivo;
+    int posicao;
+    int size;
+    vector<char> data;
 
 
-// use std::net::{SocketAddr, TcpStream, TcpListener};
-// use std::io::{Write, Read};
+use std::net::{SocketAddr, TcpStream, TcpListener};
+use std::io::{Write, Read};
 
-// use crate::protocol::{Request, Response, RequestType, ResponseType, BUFFER_SIZE};
+use crate::protocol::{Request, Response, RequestType, ResponseType, BUFFER_SIZE};
 
 
-// impl Request {
-//     /// Desserializa o buffer recebido do cliente
-//     pub fn desserialize(buffer: &Vec<u8>) -> Request {
-//         // Expected layout:
-//         // [0]                 -> request_type (1 byte)
-//         // [1..5]              -> descritor_arquivo (4 bytes, big-endian)
-//         // [5..9]              -> posicao (4 bytes, big-endian)
-//         // [9..13]             -> size (4 bytes, big-endian)
-//         // [13..]              -> data (remaining bytes)
-//         Request {
-//             request_type: match buffer[0] {
-//                 0 => RequestType::Abre,
-//                 1 => RequestType::Le,
-//                 2 => RequestType::Escreve,
-//                 3 => RequestType::Fecha,
-//                 _ => panic!("Invalid request type"),
-//             },
-//             descritor_arquivo: i32::from_be_bytes(buffer[1..5].try_into().unwrap()),
-//             posicao: u64::from_be_bytes(buffer[5..13].try_into().unwrap()),
-//             size: u32::from_be_bytes(buffer[13..17].try_into().unwrap()),
-//             data: buffer[17..].to_vec(),
-//         }
-//     }
-//     pub fn serialize(response: Request) -> Vec<u8> {
-//         let mut buffer: Vec<u8> = vec![];
-//         buffer.push(response.request_type as u8);
-//         buffer.extend(&response.descritor_arquivo.to_be_bytes());
-//         buffer.extend(&response.posicao.to_be_bytes());
-//         buffer.extend(&response.size.to_be_bytes());
-//         buffer.extend(response.data);
-//         buffer
-//     }
-// }
+impl Request {
+    /// Desserializa o buffer recebido do cliente
+    pub fn desserialize(buffer: &Vec<u8>) -> Request {
+        // Expected layout:
+        // [0]                 -> request_type (1 byte)
+        // [1..5]              -> descritor_arquivo (4 bytes, big-endian)
+        // [5..9]              -> posicao (4 bytes, big-endian)
+        // [9..13]             -> size (4 bytes, big-endian)
+        // [13..]              -> data (remaining bytes)
+        Request {
+            request_type: match buffer[0] {
+                0 => RequestType::Abre,
+                1 => RequestType::Le,
+                2 => RequestType::Escreve,
+                3 => RequestType::Fecha,
+                _ => panic!("Invalid request type"),
+            },
+            descritor_arquivo: i32::from_be_bytes(buffer[1..5].try_into().unwrap()),
+            posicao: u64::from_be_bytes(buffer[5..13].try_into().unwrap()),
+            size: u32::from_be_bytes(buffer[13..17].try_into().unwrap()),
+            data: buffer[17..].to_vec(),
+        }
+    }
+    pub fn serialize(response: Request) -> Vec<u8> {
+        let mut buffer: Vec<u8> = vec![];
+        buffer.push(response.request_type as u8);
+        buffer.extend(&response.descritor_arquivo.to_be_bytes());
+        buffer.extend(&response.posicao.to_be_bytes());
+        buffer.extend(&response.size.to_be_bytes());
+        buffer.extend(response.data);
+        buffer
+    }
+}
 
-// impl Response {
-//     pub fn serialize(response: Response) -> Vec<u8> {
-//         let mut buffer: Vec<u8> = vec![];
-//         buffer.push(response.response_type as u8);
-//         buffer.extend(response.data);
-//         buffer
-//     }
-//     pub fn desserialize(buffer: &Vec<u8>) -> Response {
-//         Response {
-//             response_type: match buffer[0] {
-//                 0 => ResponseType::Ok,
-//                 1 => ResponseType::AtualizaCache,
-//                 2 => ResponseType::Erro,
-//                 _ => panic!("Invalid response type"),
-//             },
-//             data: buffer[1..].to_vec(),
-//         }
-//     }
-// }
+impl Response {
+    pub fn serialize(response: Response) -> Vec<u8> {
+        let mut buffer: Vec<u8> = vec![];
+        buffer.push(response.response_type as u8);
+        buffer.extend(response.data);
+        buffer
+    }
+    pub fn desserialize(buffer: &Vec<u8>) -> Response {
+        Response {
+            response_type: match buffer[0] {
+                0 => ResponseType::Ok,
+                1 => ResponseType::AtualizaCache,
+                2 => ResponseType::Erro,
+                _ => panic!("Invalid response type"),
+            },
+            data: buffer[1..].to_vec(),
+        }
+    }
+}
