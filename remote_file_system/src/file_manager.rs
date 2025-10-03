@@ -2,12 +2,18 @@ use std::fs::{File, OpenOptions};
 use std::collections::HashMap;
 use std::os::unix::fs::FileExt;
 
+const FILES_PATH: &str = "./files/";
+
 pub struct FileManager {
     file_table: HashMap<i32, File>,
 }
 
 impl FileManager {
     pub fn new() -> Self {
+        // Ensure the files directory exists
+        if let Err(e) = std::fs::create_dir_all(FILES_PATH) {
+            println!("Warning: Could not create files directory on {}: {}", FILES_PATH, e);
+        }
         Self {file_table: HashMap::new()}
     }
     /// ● A função retorno um descritor de arquivo uma vez passado o nome do
@@ -17,14 +23,23 @@ impl FileManager {
     /// 
     /// ● o valor de retorno inteiro (int) deve representar códigos de erro, na
     /// impossibilidade de execução da operação;
-    pub fn abre(&mut self, descritor_arquivo: i32, nome_arquivo: String) -> i32 {
+    pub fn abre(&mut self, descritor_arquivo: i32, nome_arquivo: &String) -> i32 {
         // verify if it is already on the table
         if self.file_table.contains_key(&descritor_arquivo) {
             return 0;
         }
+        // Clean the filename to remove any null bytes or invalid characters
+        let clean_filename = nome_arquivo
+            .trim_end_matches('\0')  // Remove trailing null bytes
+            .replace('\0', "");      // Remove any internal null bytes
+            
+        let file_path = format!("{}{}", FILES_PATH, clean_filename);
+        
         let file: File = match OpenOptions::new()
-        .create(true)
-        .open(&nome_arquivo) {
+            .create(true)
+            .read(true)     // Add read permission
+            .write(true)    // Add write permission
+        .open(file_path) {
             Ok(f) => f,
             Err(e) => {
                 println!("Erro {} ao abrir arquivo: {}", e, nome_arquivo);
@@ -53,7 +68,7 @@ impl FileManager {
                         buffer.len() as i32
                     }
                     Err(e) => {
-                        println!("Erro {} ao abrir arquivo: {}", e, descritor_arquivo);
+                        println!("Erro ao ler arquivo {}: {}", descritor_arquivo, e);
                         -1
                     }
                 }

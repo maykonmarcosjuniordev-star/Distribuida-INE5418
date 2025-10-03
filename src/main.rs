@@ -1,37 +1,33 @@
-// for multithreading
+// https://doc.rust-lang.org/rust-by-example/scope/lifetime/explicit.html
 use std::thread;
-use std::sync::{Arc, Mutex};
 
 
 use remote_file_system::server::Server;
-use remote_file_system::client::Client;
+mod agents;
+use agents::Agent;
 
 
 
 fn main() {
-    let server = Server::new("127.0.0.1", 8080);
-    let client = Client::new(server.get_address());
-    let server = Arc::new(Mutex::new(server));
-    let client = Arc::new(Mutex::new(client));
+    let mut server = Server::new("127.0.0.1", 8080);
+    let server_addr = server.get_address();
     let server_handle = {
-        let server = Arc::clone(&server);
         thread::spawn(move || {
-            let mut server = server.lock().unwrap();
             server.run();
         })
     };
-    let client_handle = {
-        let client = Arc::clone(&client);
-        thread::spawn(move || {
-            let client = client.lock().unwrap();
-            client.abre(1, String::from("file.txt"));
-            let mut buffer = vec![0; 13];
-            for i in 0..13 {
-                buffer[i] = i as u8;
-            }
-            client.escreve(1, 0, &mut buffer, 13);
-        })
-    };
+    let mut agents_handles = vec![];
+    for i in 0..1 {
+        let addr = format!("127.0.0.1:{}", 8081 + i).parse().unwrap();
+        println!("Creating agent {} on address {}", i, addr);
+        let mut agent = Agent::new(i, &server_addr, addr);
+        let handle = thread::spawn(move || {
+            agent.run();
+        });
+        agents_handles.push(handle);
+    }
+    for handle in agents_handles {
+        handle.join().unwrap();
+    }
     server_handle.join().unwrap();
-    client_handle.join().unwrap();
 }

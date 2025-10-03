@@ -3,13 +3,6 @@
 version = 4
 
 [[package]]
-name = "Distribuida-INE5418"
-version = "0.1.0"
-dependencies = [
- "remote_file_system",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.176"
 source = "registry+https://github.com/rust-lang/crates.io-index"
