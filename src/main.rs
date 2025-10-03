@@ -17,8 +17,8 @@ fn main() {
         })
     };
     let mut agents_handles = vec![];
-    for i in 0..1 {
-        let addr = format!("127.0.0.1:{}", 8081 + i).parse().unwrap();
+    for i in 0..5 {
+        let addr = format!("127.0.0.1:{}", 8081 + i).parse().expect("Failed to parse agent address");
         println!("Creating agent {} on address {}", i, addr);
         let mut agent = Agent::new(i, &server_addr, addr);
         let handle = thread::spawn(move || {
@@ -27,7 +27,7 @@ fn main() {
         agents_handles.push(handle);
     }
     for handle in agents_handles {
-        handle.join().unwrap();
+        handle.join().expect("Failed to join agent thread");
     }
-    server_handle.join().unwrap();
+    server_handle.join().expect("Failed to join server thread");
 }

@@ -96,9 +96,9 @@ impl Client {
         listener.set_nonblocking(true).expect("Cannot set non-blocking");
         // aguarda por mensagens de invalidação
         for stream in listener.incoming() {
-            let mut stream = stream.unwrap();
+            let mut stream = stream.expect("Failed to accept connection");
             let mut temp_buffer: Vec<u8> = vec![0; BUFFER_SIZE];
-            stream.read(&mut temp_buffer).unwrap();
+            stream.read(&mut temp_buffer).expect("Failed to read from stream");
             let response = Response::desserialize(&temp_buffer);
             if response.response_type == ResponseType::AtualizaCache {
                 // invalida o dado na cache
@@ -203,7 +203,7 @@ impl Client {
                 println!("Cache invalidation for file descriptor {} at position {}", descritor_arquivo, posicao);
                 let _ = self.cache
                             .lock()
-                            .unwrap()
+                            .expect("Failed to lock cache")
                             .extract_if(|item| 
                             item.descritor_arquivo == descritor_arquivo 
                             && item.start >= posicao

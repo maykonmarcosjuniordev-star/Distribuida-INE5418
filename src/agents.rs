@@ -20,8 +20,8 @@ impl Agent {
             self.client.get_client_address()
         );
         // Example operations
-        let filename = format!("file_{}.txt", self.id);
-        let fd = self.id as i32; // Using id as file descriptor for simplicity
+        let filename = format!("file.txt");// format!("file_{}.txt", self.id);
+        let fd = 0; // self.id as i32; // Using id as file descriptor for simplicity
 
         // Open file
         println!("Agent {} opening file {}", self.id, filename);

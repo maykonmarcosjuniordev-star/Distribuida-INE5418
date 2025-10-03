@@ -49,9 +49,9 @@ impl Request {
             3 => RequestType::Fecha,
             _ => panic!("Invalid request type"),
         };
-        let descritor_arquivo = i32::from_be_bytes(buffer[1..5].try_into().unwrap());
-        let posicao = u64::from_be_bytes(buffer[5..13].try_into().unwrap());
-        let size = u32::from_be_bytes(buffer[13..17].try_into().unwrap());
+        let descritor_arquivo = i32::from_be_bytes(buffer[1..5].try_into().expect("Failed to parse descritor_arquivo"));
+        let posicao = u64::from_be_bytes(buffer[5..13].try_into().expect("Failed to parse posicao"));
+        let size = u32::from_be_bytes(buffer[13..17].try_into().expect("Failed to parse size"));
         let data = buffer[17..(17 + (size as usize))].to_vec();
         Request {
             request_type,
@@ -101,9 +101,9 @@ impl Response {
         }
     }
     pub fn parse_atualiza_cache(response: Response) -> (i32, u64, usize) {
-        let descritor_arquivo = i32::from_be_bytes(response.data[0..4].try_into().unwrap());
-        let posicao = u64::from_be_bytes(response.data[4..12].try_into().unwrap());
-        let tamanho = u64::from_be_bytes(response.data[12..20].try_into().unwrap()) as usize;
+        let descritor_arquivo = i32::from_be_bytes(response.data[0..4].try_into().expect("Failed to parse descritor_arquivo"));
+        let posicao = u64::from_be_bytes(response.data[4..12].try_into().expect("Failed to parse posicao"));
+        let tamanho = u64::from_be_bytes(response.data[12..20].try_into().expect("Failed to parse tamanho")) as usize;
         (descritor_arquivo, posicao, tamanho)
     }
 }

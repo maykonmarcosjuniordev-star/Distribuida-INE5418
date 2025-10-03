@@ -16,7 +16,7 @@ pub struct Server {
 impl Server {
     pub fn new(ip_addres: &str, port: u16) -> Self {
         let files = FileManager::new();
-        let ip = ip_addres.parse::<Ipv4Addr>().unwrap();
+        let ip = ip_addres.parse::<Ipv4Addr>().expect("Failed to parse IP address");
         let address = SocketAddr::new(IpAddr::V4(ip), port);
         let file_watchers = HashMap::new();
         Self {files, address, file_watchers}
@@ -29,7 +29,7 @@ impl Server {
     /// Envia o buffer para o endereço do cliente
     /// Creando uma stream TCP
     fn send(buffer: Vec<u8>, stream: &mut TcpStream) {
-        stream.write(&buffer).unwrap();
+        stream.write(&buffer).expect("Failed to write to stream");
     }
 
     /// Chama o file manager para abrir o arquivo
@@ -39,9 +39,18 @@ impl Server {
             0 => {
                 let usr = self.file_watchers.get_mut(&descritor_arquivo);
                 match usr {
-                    Some(u) => u.push(client.peer_addr().unwrap()),
+                    Some(u) => {
+                        u.push(client
+                            .peer_addr()
+                            .expect("Failed to get client address"));
+                    },
                     None => {
-                        self.file_watchers.insert(descritor_arquivo, vec![client.peer_addr().unwrap()]);
+                        self.file_watchers
+                            .insert(descritor_arquivo,
+                                 vec![client
+                                 .peer_addr()
+                                 .expect("Failed to get client address")]
+                            );
                     }
                 }
             },
@@ -95,13 +104,16 @@ impl Server {
                 let usrs = self.file_watchers
                     .get(&descritor_arquivo)
                     .expect("shouldn't happen");
-                let addr = client.peer_addr().unwrap();
+                let addr = client.peer_addr().expect("Failed to get client address");
                 for usr in usrs {
                     if *usr != addr {
                         let response = Response::create_atualiza_cache(descritor_arquivo, posicao, tamanho);
                         let buffer = Response::serialize(response);
-                        let mut stream = TcpStream::connect(usr).unwrap();
-                        Self::send(buffer, &mut stream);
+                        if let Ok(mut stream) = TcpStream::connect(usr) {
+                            Self::send(buffer, &mut stream);
+                        } else {
+                            println!("-> Server failed to connect to client {}", usr);
+                        }
                     }
                 }
                 // mantém apenas o cliente que fez a escrita na lista de usuários
@@ -121,7 +133,7 @@ impl Server {
     pub fn fecha(&mut self, descritor_arquivo: i32, client: &mut TcpStream) {
         match self.files.fecha(descritor_arquivo) {
             0 => {
-                let addr = client.peer_addr().unwrap();
+                let addr = client.peer_addr().expect("Failed to get client address");
                 self.file_watchers
                     .get_mut(&descritor_arquivo)
                     .expect("File not found")
@@ -171,10 +183,10 @@ impl Server {
             };
             match stream {
                 Ok(mut stream) => {
-                    let current_client = stream.peer_addr().unwrap();
+                    let current_client = stream.peer_addr().expect("Failed to get client address");
                     println!("New connection on Server: {}", current_client);
                     let mut buffer_socket = vec![0; 1024];
-                    let amt = stream.read(&mut buffer_socket).unwrap();
+                    let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
                     println!("Server Received {} bytes from {}", amt, current_client);
                     let mut buffer_vect = vec![];
                     let requisito = Request::desserialize(&buffer_socket);
@@ -185,7 +197,7 @@ impl Server {
         
                     match requisito.request_type {
                         RequestType::Abre => {
-                            self.abre(requisito.descritor_arquivo, String::from_utf8(requisito.data).unwrap(), &mut stream);
+                            self.abre(requisito.descritor_arquivo, String::from_utf8(requisito.data).expect("Failed to convert data to string"), &mut stream);
                         },
                         RequestType::Le => {
                             self.le(requisito.descritor_arquivo, requisito.posicao, requisito.size as usize, &mut stream);
