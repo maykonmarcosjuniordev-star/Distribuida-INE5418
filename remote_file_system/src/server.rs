@@ -1,5 +1,5 @@
 use std::io::{Write, Read, ErrorKind::WouldBlock};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
+use std::net::{UdpSocket, IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
 use std::sync::Mutex;
@@ -33,8 +33,27 @@ impl Server {
     /// Envia o buffer para o endereço do cliente
     /// Creando uma stream TCP
     fn send(response: Response, stream: &mut TcpStream) {
-        let buffer = Response::serialize(response);
+        let buffer = Response::serialize(&response);
         stream.write(&buffer).expect("Failed to write to stream");
+    }
+
+    /// Envia mensagens de invalidação de cache para o cliente
+    /// usando Sockets UDP para permitir que haja buffer de mensagens
+    fn send_warning(&self, response: Response, descritor_arquivo: i32) {
+        if let Ok(watchers) = self.file_watchers.lock() {
+            let usrs = watchers
+                .get(&descritor_arquivo)
+                .expect("File not found");
+            let socket = UdpSocket::bind(self.address)
+                .expect("Failed to bind UDP socket on server");
+            for usr in usrs {
+                let buffer = Response::serialize(&response);
+                match socket.send_to(&buffer, usr) {
+                    Ok(size) => println!("Sent cache invalidation to {}: {} bytes", usr, size),
+                    Err(e) => println!("Failed to send cache invalidation to {}: {}", usr, e),
+                }
+            }
+        }
     }
 
     /// Chama o file manager para abrir o arquivo
@@ -94,29 +113,15 @@ impl Server {
                 Self::send(response, client);
             },
             i => {
+                let response = self.response_factory
+                    .create_cache_invalidation(request.descritor_arquivo,
+                        request.posicao,
+                        request.tamanho as usize
+                    );
+                self.send_warning(response, request.descritor_arquivo);
                 let addr = client
                     .peer_addr()
                     .expect("Failed to get client address");
-                if let Ok(watchers) = self.file_watchers.lock() {
-                    let usrs = watchers
-                        .get(&request.descritor_arquivo)
-                        .expect("File not found");
-                    for usr in usrs {
-                        if *usr == addr {
-                            continue;
-                        }
-                        match TcpStream::connect(usr) {
-                            Ok(mut stream) => {
-                                let response = self.response_factory.create_cache_invalidation(request.descritor_arquivo, request.posicao, request.tamanho as usize);
-                                Self::send(response, &mut stream);
-                            }
-                            Err(e) => {
-                                println!("-> Server failed to connect to client {} when trying to invalidate cache: {}", usr, e);
-                                continue;
-                            }
-                        }
-                    }
-                }
                 // mantém apenas o cliente que fez a escrita na lista de usuários
                 self.file_watchers
                     .lock()
@@ -189,7 +194,6 @@ impl Server {
             match stream {
                 Ok(mut stream) => {
                     let current_client = stream.peer_addr().expect("Failed to get client address");
-                    println!("New connection on Server: {}", current_client);
                     let mut buffer_socket = vec![0; 1024];
                     let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
                     println!("Server Received {} bytes from {}", amt, current_client);

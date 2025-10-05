@@ -37,16 +37,18 @@ impl Agent {
             0 => println!("Agent {} wrote to file {}", self.id, filename),
             i => println!("Error: Agent {} failed to write to file {}: {}", self.id, filename, i),
         }
-        
+
         // Read from file
-        let mut buffer = vec![];
-        println!("Agent {} reading from file {}", self.id, filename);
-        match self.client.le(fd, 0, &mut buffer, data.len()) {
-            -1 => println!("Error: Agent {} failed to read from file {}", self.id, filename),
-            size => {
-                let msg = String::from_utf8_lossy(&buffer[..size as usize]);
-                println!("Agent {} read data: {:?}", self.id, msg);
-            },
+        for _ in 0..2 {
+            let mut buffer = vec![];
+            println!("Agent {} reading from file {}", self.id, filename);
+            match self.client.le(fd, 0, &mut buffer, data.len()) {
+                -1 => println!("Error: Agent {} failed to read from file {}", self.id, filename),
+                size => {
+                    let msg = String::from_utf8_lossy(&buffer[..size as usize]);
+                    println!("Agent {} read data: {:?}", self.id, msg);
+                },
+            }
         }
 
         // Close file

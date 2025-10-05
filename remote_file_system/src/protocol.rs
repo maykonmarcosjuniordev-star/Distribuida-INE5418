@@ -46,13 +46,13 @@ impl Request {
             data,
         }
     }
-    pub fn serialize(request: Request) -> Vec<u8> {
+    pub fn serialize(request: &Request) -> Vec<u8> {
         let mut buffer: Vec<u8> = vec![];
         buffer.push(request.request_type as u8);
         buffer.extend(&request.descritor_arquivo.to_be_bytes());
         buffer.extend(&request.posicao.to_be_bytes());
         buffer.extend(&request.tamanho.to_be_bytes());
-        buffer.extend(request.data);
+        buffer.extend(&request.data);
         buffer
     }
 }
@@ -73,10 +73,10 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn serialize(response: Response) -> Vec<u8> {
+    pub fn serialize(response: &Response) -> Vec<u8> {
         let mut buffer: Vec<u8> = vec![];
         buffer.push(response.response_type as u8);
-        buffer.extend(response.data);
+        buffer.extend(&response.data);
         buffer
     }
     pub fn desserialize(buffer: &Vec<u8>) -> Response {
@@ -90,7 +90,7 @@ impl Response {
             data: buffer[1..].to_vec(),
         }
     }
-    pub fn parse_atualiza_cache(response: Response) -> (i32, u64, usize) {
+    pub fn parse_atualiza_cache(response: &Response) -> (i32, u64, usize) {
         let descritor_arquivo = i32::from_be_bytes(response.data[0..4].try_into().expect("Failed to parse descritor_arquivo"));
         let posicao = u64::from_be_bytes(response.data[4..12].try_into().expect("Failed to parse posicao"));
         let tamanho = u64::from_be_bytes(response.data[12..20].try_into().expect("Failed to parse tamanho")) as usize;

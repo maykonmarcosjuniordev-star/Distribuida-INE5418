@@ -17,7 +17,7 @@ fn main() {
         })
     };
     let mut agents_handles = vec![];
-    for i in 0..5 {
+    for i in 0..1 {
         let addr = format!("127.0.0.1:{}", 8081 + i).parse().expect("Failed to parse agent address");
         println!("Creating agent {} on address {}", i, addr);
         let agent = Agent::new(i, &server_addr, addr);

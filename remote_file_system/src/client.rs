@@ -18,7 +18,7 @@ Este procedimento é comum na implementação de mecanismos para coerência de c
 É permitida a utilização de outras estratégias para coerência de cache.
 */
 use std::collections::LinkedList;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpStream, UdpSocket};
 use std::io::{Error, Read, Write};
 use std::sync::Mutex;
 use socket2::{Socket, Domain, Type, Protocol};
@@ -39,13 +39,19 @@ pub struct  Client {
     server_address: SocketAddr,
     client_address: SocketAddr,
     request_factory: StandardRequestFactory,
+    warning_socket: UdpSocket,
 }
 
 impl Client {
     pub fn new(server_address: SocketAddr, client_address: SocketAddr) -> Self {
         let cache = Mutex::new(LinkedList::new());
         let request_factory = StandardRequestFactory;
-        Self {server_address, client_address, cache, request_factory}
+        let warning_socket = UdpSocket::bind(client_address)
+            .expect("Failed to bind UDP socket for warnings");
+        warning_socket
+            .set_nonblocking(true)
+            .expect("Failed to set non-blocking mode");
+        Self {server_address, client_address, cache, request_factory, warning_socket}
     }
 
     pub fn get_server_address(&self) -> SocketAddr {
@@ -60,8 +66,6 @@ impl Client {
     /// E recebe a resposta do servidor
     /// Creando uma stream TCP
     fn send(&self, request: Request) -> Result<Response, Error> {
-        // Serializa a requisição
-        let buffer = Request::serialize(request);
         // Cria o socket
         let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
         // Define opções do socket
@@ -72,6 +76,8 @@ impl Client {
         socket.connect(&self.server_address.into())?;
         // Converte para TcpStream
         let mut stream: TcpStream = socket.into();
+        // Serializa a requisição
+        let buffer = Request::serialize(&request);
         // Send request
         stream.write(&buffer)?;
         stream.flush()?;
@@ -83,7 +89,7 @@ impl Client {
         return Ok(response);
     }
 
-    fn invalidate_cache(&self, response: Response) {
+    fn invalidate_cache(&self, response: &Response) {
         // invalida o dado na cache
         let (descriptor, pos, size) = Response::parse_atualiza_cache(response);
         let end = pos + size as u64;
@@ -99,30 +105,32 @@ impl Client {
     }
 
     /// checa se a cache não está inválida
-    fn verify_cache(&self) {
-        let listener = match TcpListener::bind(self.client_address) {
-            Ok(l) => {
-                println!("Cache listener started on {}", self.client_address);
-                l
-            },
-            Err(e) => {
-                println!("Failed to start cache listener on {}: {}", self.client_address, e);
-                return;
+    /// Usando um listener UDP
+    /// Se receber uma mensagem de invalidação, remove o item da cache
+    /// Retorna -1 se erro, 0 se não há mensagens, n se há n mensagens de invalidação de cache
+    fn verify_cache(&self) -> i32 {
+        println!("Verifying cache for client at address {}", self.client_address);
+        let mut buf = [0; BUFFER_SIZE];
+        let mut output = 0;
+        while let Ok((amt, src)) = self.warning_socket.recv_from(&mut buf) {
+            println!("Received warning on cache listener, {} bytes from {}", amt, src);
+            let response = Response::desserialize(&buf.to_vec());
+            match response.response_type {
+                ResponseType::AtualizaCache => {
+                        output += 1;
+                        self.invalidate_cache(&response)
+                    },
+                    ResponseType::Ok => {
+                        output = -1;
+                        println!(" --- Received OK message on cache listener")
+                    },
+                    ResponseType::Erro => {
+                        output = -1;
+                        println!(" --- Received Error message on cache listener")
+                    },
+                }
             }
-        };
-        listener.set_nonblocking(true).expect("Cannot set non-blocking");
-        // aguarda por mensagens de invalidação
-        for stream in listener.incoming() {
-            let mut stream = stream.expect("Failed to accept connection");
-            let mut temp_buffer: Vec<u8> = vec![0; BUFFER_SIZE];
-            stream.read(&mut temp_buffer).expect("Failed to read from stream");
-            let response = Response::desserialize(&temp_buffer);
-            if response.response_type == ResponseType::AtualizaCache {
-                self.invalidate_cache(response);
-            } else {
-                println!("Received non-invalidation message on cache listener");
-            }
-        }
+        return output;
     }
     
     /// Abre o arquivo no servidor remoto
@@ -146,6 +154,7 @@ impl Client {
     /// Retorna o número de bytes lidos, -1 se erro
     pub fn le(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         // Verifica se o dado está na cache
+        self.verify_cache();
         if let Ok(c) = self.cache.lock() {
             for item in &*c {
                 if item.descritor_arquivo == descritor_arquivo
@@ -153,7 +162,6 @@ impl Client {
                     && item.end >= posicao + tamanho as u64
                 {
                     println!("Cache hit for file descriptor {} at position {}", descritor_arquivo, posicao);
-                    self.verify_cache();
                     // se ainda está na cache, lê dela
                     let start = (posicao - item.start) as usize;
                     let end = start + tamanho;
@@ -201,7 +209,7 @@ impl Client {
             ResponseType::AtualizaCache => {
                 // invalida o dado na cache
                 println!("Received cache invalidation response from server instead of data");
-                self.invalidate_cache(response);
+                self.invalidate_cache(&response);
                 return -1;
             },
             ResponseType::Erro => {
