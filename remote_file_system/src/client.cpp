@@ -36,8 +36,8 @@ enum ResponseType {
 struct Request {
     enum RequestType request_type;
     int descritor_arquivo;
-    int posicao;
-    int size;
+    unsigned long long posicao;
+    unsigned int size;
     vector<char> data;
 };
 
@@ -108,7 +108,7 @@ public:
         return rsp.response_type;
     }
 
-    int escreve(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, int tamanho) {
+    int escreve(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, unsigned int tamanho) {
         Request rqst;
         rqst.request_type = RequestType::ESCREVE;
         rqst.descritor_arquivo = descritor_arquivo;
@@ -123,7 +123,7 @@ public:
         return rsp.response_type;
     }
 
-    int le(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, int tamanho) {
+    int le(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, unsigned int tamanho) {
         for (auto item : cache) {
             if (item.descritor_arquivo == descritor_arquivo and item.start <= posicao and posicao+tamanho <= item.end) {
                 int cacheStatus = verify_cache(item);
@@ -194,8 +194,8 @@ public:
             if (rsp.response_type == CACHE_UPDATE) {
                 vector<char> data = rsp.data;
                 int descriptor = getNumberi32(data);
-                int posicao = getNumberu64(data);
-                int sizee = getNumberu64(data);
+                unsigned long long posicao = getNumberu64(data);
+                unsigned int sizee = getNumberu32(data);
                 
                 if ((checkItem.descritor_arquivo == descriptor) && (
                     (checkItem.start >= posicao && posicao <= checkItem.end) ||
@@ -264,6 +264,15 @@ public:
         return number;
     }
 
+    unsigned int getNumberu32(vector<char> &buffer) {
+        uint32_t b0 = static_cast<uint8_t>(buffer[0]);
+        uint32_t b1 = static_cast<uint8_t>(buffer[1]);
+        uint32_t b2 = static_cast<uint8_t>(buffer[2]);
+        uint32_t b3 = static_cast<uint8_t>(buffer[3]);
+        unsigned int number = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+        buffer.erase(buffer.begin(), buffer.begin() + 4);
+        return number;
+    }
 };
 
 
