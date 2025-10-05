@@ -14,7 +14,7 @@ impl Agent {
         Self {client, id}
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         println!("Agent {} started on address {}",
             self.id,
             self.client.get_client_address()

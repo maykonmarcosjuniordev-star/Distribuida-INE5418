@@ -9,7 +9,7 @@ use agents::Agent;
 
 
 fn main() {
-    let mut server = Server::new("127.0.0.1", 8080);
+    let server = Server::new("127.0.0.1", 8080);
     let server_addr = server.get_address();
     let server_handle = {
         thread::spawn(move || {
@@ -20,7 +20,7 @@ fn main() {
     for i in 0..5 {
         let addr = format!("127.0.0.1:{}", 8081 + i).parse().expect("Failed to parse agent address");
         println!("Creating agent {} on address {}", i, addr);
-        let mut agent = Agent::new(i, &server_addr, addr);
+        let agent = Agent::new(i, &server_addr, addr);
         let handle = thread::spawn(move || {
             agent.run();
         });

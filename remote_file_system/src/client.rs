@@ -20,11 +20,11 @@ Este procedimento é comum na implementação de mecanismos para coerência de c
 use std::collections::LinkedList;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::io::{Error, Read, Write};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use socket2::{Socket, Domain, Type, Protocol};
 
 const MAX_CACHE_SIZE: usize = 1024 * 1024; // 1MB
-use crate::protocol::{Request, Response, RequestType, ResponseType, BUFFER_SIZE};
+use crate::protocol::{Request, Response, ResponseType, RequestFactory, StandardRequestFactory, BUFFER_SIZE};
 
 #[derive(Clone)]
 struct CacheItem {
@@ -35,15 +35,17 @@ struct CacheItem {
 }
 
 pub struct  Client {
-    cache: Arc<Mutex<LinkedList<CacheItem>>>,
+    cache: Mutex<LinkedList<CacheItem>>,
     server_address: SocketAddr,
     client_address: SocketAddr,
+    request_factory: StandardRequestFactory,
 }
 
 impl Client {
     pub fn new(server_address: SocketAddr, client_address: SocketAddr) -> Self {
-        let cache = Arc::new(Mutex::new(LinkedList::new()));
-        Self {server_address, client_address, cache}
+        let cache = Mutex::new(LinkedList::new());
+        let request_factory = StandardRequestFactory;
+        Self {server_address, client_address, cache, request_factory}
     }
 
     pub fn get_server_address(&self) -> SocketAddr {
@@ -80,7 +82,22 @@ impl Client {
         let response = Response::desserialize(&buffer);
         return Ok(response);
     }
-    
+
+    fn invalidate_cache(&self, response: Response) {
+        // invalida o dado na cache
+        let (descriptor, pos, size) = Response::parse_atualiza_cache(response);
+        let end = pos + size as u64;
+        if let Ok(mut c) = self.cache.lock() {
+            println!("Current cache size: {}", c.len());
+            let _ = c.extract_if(|item|
+                item.descritor_arquivo == descriptor
+                && (item.start <= end
+                    && item.end >= pos)
+                );
+        }
+        println!("Cache invalidation for file descriptor {} at position {}", descriptor, pos);
+    }
+
     /// checa se a cache não está inválida
     fn verify_cache(&self) {
         let listener = match TcpListener::bind(self.client_address) {
@@ -101,18 +118,9 @@ impl Client {
             stream.read(&mut temp_buffer).expect("Failed to read from stream");
             let response = Response::desserialize(&temp_buffer);
             if response.response_type == ResponseType::AtualizaCache {
-                // invalida o dado na cache
-                let (descriptor, pos, size) = Response::parse_atualiza_cache(response);
-                let end = pos + size as u64;
-                if let Ok(mut c) = self.cache.lock() {
-                    println!("Current cache size: {}", c.len());
-                    let _ = c.extract_if(|item|
-                        item.descritor_arquivo == descriptor
-                        && (item.start <= end
-                            && item.end >= pos)
-                        );
-                }
-                println!("Cache invalidation for file descriptor {} at position {}", descriptor, pos);
+                self.invalidate_cache(response);
+            } else {
+                println!("Received non-invalidation message on cache listener");
             }
         }
     }
@@ -121,14 +129,7 @@ impl Client {
     /// Retorna 0 se sucesso, -1 se erro
     pub fn abre(&self, descritor_arquivo: i32, nome_arquivo: String) -> i32 {
         // cria a requisição
-        let data = nome_arquivo.into_bytes();
-        let request = Request {
-            request_type: RequestType::Abre,
-            descritor_arquivo: descritor_arquivo,
-            posicao: 0,
-            size: data.len() as u32,
-            data
-        };
+        let request = self.request_factory.create_open_request(descritor_arquivo, nome_arquivo);
         // envia a requisição para o servidor e aguarda a resposta
         let response = match self.send(request) {
             Ok(resp) => resp,
@@ -147,7 +148,10 @@ impl Client {
         // Verifica se o dado está na cache
         if let Ok(c) = self.cache.lock() {
             for item in &*c {
-                if item.descritor_arquivo == descritor_arquivo && item.start <= posicao && item.end >= posicao + tamanho as u64 {
+                if item.descritor_arquivo == descritor_arquivo
+                    && item.start <= posicao
+                    && item.end >= posicao + tamanho as u64
+                {
                     println!("Cache hit for file descriptor {} at position {}", descritor_arquivo, posicao);
                     self.verify_cache();
                     // se ainda está na cache, lê dela
@@ -162,13 +166,7 @@ impl Client {
         }
         // não encontrou na cache
         // cria a requisição
-        let request = Request {
-            request_type: RequestType::Le,
-            descritor_arquivo,
-            posicao,
-            size: tamanho as u32,
-            data: vec![],
-        };
+        let request = self.request_factory.create_read_request(descritor_arquivo, posicao, tamanho);
         // envia a requisição para o servidor e aguarda a resposta
         let response = match self.send(request) {
             Ok(resp) => resp,
@@ -190,7 +188,9 @@ impl Client {
                     data: buffer[..tamanho].to_vec(),
                 };
                 if let Ok(mut c) = self.cache.lock() {
+                    // adiciona o item na cache
                     c.push_back(cache_item);
+                    // Garante que a cache não ultrapasse o tamanho máximo
                     while c.len() > MAX_CACHE_SIZE {
                         c.pop_front();                        
                     }
@@ -200,17 +200,12 @@ impl Client {
             },
             ResponseType::AtualizaCache => {
                 // invalida o dado na cache
-                println!("Cache invalidation for file descriptor {} at position {}", descritor_arquivo, posicao);
-                let _ = self.cache
-                            .lock()
-                            .expect("Failed to lock cache")
-                            .extract_if(|item| 
-                            item.descritor_arquivo == descritor_arquivo 
-                            && item.start >= posicao
-                            && item.end <= posicao + tamanho as u64);
+                println!("Received cache invalidation response from server instead of data");
+                self.invalidate_cache(response);
                 return -1;
             },
             ResponseType::Erro => {
+                println!("Server returned error for read request on file descriptor {}", descritor_arquivo);
                 return -1;
             },
         }
@@ -221,13 +216,7 @@ impl Client {
     pub fn escreve(&self, descritor_arquivo: i32, posicao: u64,
                     buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         // cria a requisição
-        let request = Request {
-            request_type: RequestType::Escreve,
-            descritor_arquivo: descritor_arquivo,
-            posicao,
-            size: tamanho as u32,
-            data: buffer[..tamanho].to_vec(),
-        };
+        let request = self.request_factory.create_write_request(descritor_arquivo, posicao, buffer, tamanho);
         // envia a requisição para o servidor e aguarda a resposta
         let response = match self.send(request) {
             Ok(resp) => resp,
@@ -243,22 +232,19 @@ impl Client {
     /// Fecha o arquivo no servidor remoto
     /// Retorna 0 se sucesso, -1 se erro
     pub fn fecha(&self, descritor_arquivo: i32) -> i32 {
-        let request = Request {
-            request_type: RequestType::Fecha,
-            descritor_arquivo: descritor_arquivo,
-            posicao: 0,
-            size: 0,
-            data: vec![],
-        };
+        let request = self.request_factory.create_close_request(descritor_arquivo);
         // envia a requisição para o servidor e aguarda a resposta
-        let response = match self.send(request) {
-            Ok(resp) => resp,
+        match self.send(request) {
+            Ok(resp) => {
+                return match resp.response_type {
+                    ResponseType::Ok => 0,
+                    _ => -1,
+                };
+            },
             Err(e) => {
                 println!("Erro ao receber resposta do servidor na função fecha: {}", e);
                 return -1;
             }
         };
-        // retorna o código de erro
-        response.response_type as i32  
     }
 }

@@ -2,15 +2,18 @@ use std::io::{Write, Read, ErrorKind::WouldBlock};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
+use std::sync::Mutex;
+use std::vec;
 
 use crate::file_manager::FileManager;
-use crate::protocol::{Request, Response, RequestType, ResponseType, BUFFER_SIZE};
+use crate::protocol::{Request, Response, RequestType, StandardResponseFactory, ResponseFactory, BUFFER_SIZE};
 
 pub struct Server {
     files: FileManager,
     address: SocketAddr,
     /// Map of file descriptors, in each position are the clients using it.
-    file_watchers: HashMap<i32, Vec<SocketAddr>>, 
+    file_watchers: Mutex<HashMap<i32, Vec<SocketAddr>>>,
+    response_factory: StandardResponseFactory,
 }
 
 impl Server {
@@ -18,8 +21,9 @@ impl Server {
         let files = FileManager::new();
         let ip = ip_addres.parse::<Ipv4Addr>().expect("Failed to parse IP address");
         let address = SocketAddr::new(IpAddr::V4(ip), port);
-        let file_watchers = HashMap::new();
-        Self {files, address, file_watchers}
+        let file_watchers = Mutex::new(HashMap::new());
+        let response_factory = StandardResponseFactory;
+        Self {files, address, file_watchers, response_factory}
     }
     
     pub fn get_address(&self) -> SocketAddr {
@@ -28,129 +32,128 @@ impl Server {
     
     /// Envia o buffer para o endereço do cliente
     /// Creando uma stream TCP
-    fn send(buffer: Vec<u8>, stream: &mut TcpStream) {
+    fn send(response: Response, stream: &mut TcpStream) {
+        let buffer = Response::serialize(response);
         stream.write(&buffer).expect("Failed to write to stream");
     }
 
     /// Chama o file manager para abrir o arquivo
-    pub fn abre(&mut self, descritor_arquivo: i32,
-                nome_arquivo: String, client: &mut TcpStream) {
-        match self.files.abre(descritor_arquivo, &nome_arquivo) {
+    pub fn abre(&self, request: Request, client: &mut TcpStream) {
+        let nome_arquivo = String::from_utf8(request.data).expect("Failed to convert data to string");
+        match self.files.abre(request.descritor_arquivo, &nome_arquivo) {
             0 => {
-                let usr = self.file_watchers.get_mut(&descritor_arquivo);
-                match usr {
-                    Some(u) => {
-                        u.push(client
-                            .peer_addr()
-                            .expect("Failed to get client address"));
-                    },
-                    None => {
-                        self.file_watchers
-                            .insert(descritor_arquivo,
-                                 vec![client
-                                 .peer_addr()
-                                 .expect("Failed to get client address")]
-                            );
+                if let Ok(mut usr) = self.file_watchers.lock() {
+                    match usr.get_mut(&request.descritor_arquivo) {
+                        Some(u) => {
+                            u.push(client
+                                .peer_addr()
+                                .expect("Failed to get client address"));
+                        },
+                        None => {
+                            usr
+                                .insert(request.descritor_arquivo,
+                                    vec![client.peer_addr()
+                                        .expect("Failed to get client address")]
+                                );
+                        }
                     }
                 }
             },
             i => {
-                println!("Server failed to open file {} of name {}: Error {}", descritor_arquivo, nome_arquivo, i);
-                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
-                let buffer = Response::serialize(resp);
-                Self::send(buffer, client);
+                println!("Server failed to open file {} of name {}: Error {}", request.descritor_arquivo, nome_arquivo, i);
+                let response = self.response_factory.create_error_response(-1);
+                Self::send(response, client);
             },
         }
     }
 
     /// Chama o file manager para ler o arquivo e envia o buffer para o cliente
-    pub fn le(&self, descritor_arquivo: i32, posicao: u64,
-                tamanho: usize, client: &mut TcpStream) {
-        // Verifica se o arquivo está aberto por algum cliente
-        if !self.file_watchers.contains_key(&descritor_arquivo) {
-            println!("File not opened by any client");
-            return;
-        }
+    pub fn le(&self, request: Request, client: &mut TcpStream) {
         let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];
-        match self.files.le(descritor_arquivo, posicao, &mut buffer, tamanho) {
+        match self.files.le(request.descritor_arquivo, request.posicao, &mut buffer, request.tamanho as usize) {
             -1 => {
-                println!("Server failed to read the file {}: Error {}", descritor_arquivo, -1);
-                let i: i32 = -1;
-                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
-                let buffer = Response::serialize(resp);
-                Self::send(buffer, client);
+                println!("Server failed to read the file {}: Error {}", request.descritor_arquivo, -1);
+                let response = self.response_factory.create_error_response(-1);
+                Self::send(response, client);
             },
             i => {
-                let resp = Response {response_type: ResponseType::Ok, data: buffer[0..i as usize].to_vec()};
-                let buffer = Response::serialize(resp);
-                Self::send(buffer, client);
+                let response = self.response_factory.create_success_response(buffer[0..i as usize].to_vec());
+                Self::send(response, client);
             },
         }
     }
 
     /// Chama o file manager para escrever no arquivo.
     /// Invalida os caches dos outros clientes que possuem o arquivo aberto
-    pub fn escreve(&mut self, descritor_arquivo: i32, posicao: u64,
-                    buffer: &mut Vec<u8>, tamanho: usize,
-                    client: &mut TcpStream) {
-        match self.files.escreve(descritor_arquivo, posicao, buffer, tamanho) {
+    pub fn escreve(&self, request: Request, client: &mut TcpStream) {
+        let mut buffer = request.data;
+        match self.files.escreve(request.descritor_arquivo, request.posicao, &mut buffer, request.tamanho as usize) {
             -1 => {
-                println!("Server failed to write the file {}", descritor_arquivo);
-                let resp = Response {response_type: ResponseType::Erro, data: [0u8; 0].to_vec()};
-                let buffer = Response::serialize(resp);
-                Self::send(buffer, client);
+                println!("Server failed to write the file {}", request.descritor_arquivo);
+                let response = self.response_factory.create_error_response(-1);
+                Self::send(response, client);
             },
             i => {
-                let usrs = self.file_watchers
-                    .get(&descritor_arquivo)
-                    .expect("shouldn't happen");
-                let addr = client.peer_addr().expect("Failed to get client address");
-                for usr in usrs {
-                    if *usr != addr {
-                        let response = Response::create_atualiza_cache(descritor_arquivo, posicao, tamanho);
-                        let buffer = Response::serialize(response);
-                        if let Ok(mut stream) = TcpStream::connect(usr) {
-                            Self::send(buffer, &mut stream);
-                        } else {
-                            println!("-> Server failed to connect to client {}", usr);
+                let addr = client
+                    .peer_addr()
+                    .expect("Failed to get client address");
+                if let Ok(watchers) = self.file_watchers.lock() {
+                    let usrs = watchers
+                        .get(&request.descritor_arquivo)
+                        .expect("File not found");
+                    for usr in usrs {
+                        if *usr == addr {
+                            continue;
+                        }
+                        match TcpStream::connect(usr) {
+                            Ok(mut stream) => {
+                                let response = self.response_factory.create_cache_invalidation(request.descritor_arquivo, request.posicao, request.tamanho as usize);
+                                Self::send(response, &mut stream);
+                            }
+                            Err(e) => {
+                                println!("-> Server failed to connect to client {} when trying to invalidate cache: {}", usr, e);
+                                continue;
+                            }
                         }
                     }
                 }
                 // mantém apenas o cliente que fez a escrita na lista de usuários
                 self.file_watchers
-                    .get_mut(&descritor_arquivo)
+                    .lock()
+                    .expect("Failed to lock file watchers")
+                    .get_mut(&request.descritor_arquivo)
                     .expect("File not found")
                     .retain(|&x| x == addr);
-                let resp = Response {response_type: ResponseType::Ok, data: i.to_be_bytes().to_vec()};
-                let buffer = Response::serialize(resp);
-                Self::send(buffer, client);
+                let response = self.response_factory.create_success_response(i.to_be_bytes().to_vec());
+                Self::send(response, client);
             },
         }
     }
 
     /// Chama o file manager para fechar o arquivo
     /// Remove o cliente da lista de usuários do arquivo
-    pub fn fecha(&mut self, descritor_arquivo: i32, client: &mut TcpStream) {
-        match self.files.fecha(descritor_arquivo) {
+    pub fn fecha(&self, request: Request, client: &mut TcpStream) {
+        match self.files.fecha(request.descritor_arquivo) {
             0 => {
                 let addr = client.peer_addr().expect("Failed to get client address");
                 self.file_watchers
-                    .get_mut(&descritor_arquivo)
+                    .lock()
+                    .expect("Failed to lock file watchers")
+                    .get_mut(&request.descritor_arquivo)
                     .expect("File not found")
                     .retain(|&x| x != addr);
 
             },
             i => {
-                println!("Server failed to close file {}: Error {}", descritor_arquivo, i);
-                let resp = Response {response_type: ResponseType::Erro, data: i.to_be_bytes().to_vec()};
-                let buffer = Response::serialize(resp);
-                Self::send(buffer, client);
+                println!("Server failed to close file {}: Error {}", request.descritor_arquivo, i);
+                let response = self.response_factory.create_error_response(-1);
+                Self::send(response, client);
             },
         }
 
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         println!("Server listening on {}", self.address);
         let listener = TcpListener::bind(self.address).expect("Failed to bind server address");
         // accept connections and process them serially
@@ -169,8 +172,9 @@ impl Server {
             Err(ref e) if e.kind() == WouldBlock => {
                 // no connection available right now
                 if last_activity.elapsed() >= timeout {
-                // no activity for the timeout period -> break the loop
-                break;
+                    // no activity for the timeout period -> break the loop
+                    println!("Server timed out due to inactivity.");
+                    break;
                 }
                 // avoid busy-looping
                 std::thread::sleep(Duration::from_millis(50));
@@ -178,6 +182,7 @@ impl Server {
             }
             Err(e) => {
                 // an actual error occurred while accepting
+                println!("Error accepting connection: {}", e);
                 Err(e)
             }
             };
@@ -189,25 +194,24 @@ impl Server {
                     let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
                     println!("Server Received {} bytes from {}", amt, current_client);
                     let mut buffer_vect = vec![];
-                    let requisito = Request::desserialize(&buffer_socket);
+                    let request = Request::desserialize(&buffer_socket);
         
                     for i in 0..amt {
                         buffer_vect.push(buffer_socket[i].clone());
                     }
         
-                    match requisito.request_type {
+                    match request.request_type {
                         RequestType::Abre => {
-                            self.abre(requisito.descritor_arquivo, String::from_utf8(requisito.data).expect("Failed to convert data to string"), &mut stream);
+                            self.abre(request, &mut stream);
                         },
                         RequestType::Le => {
-                            self.le(requisito.descritor_arquivo, requisito.posicao, requisito.size as usize, &mut stream);
+                            self.le(request, &mut stream);
                         },
                         RequestType::Escreve => {
-                            let mut buffer = requisito.data;
-                            self.escreve(requisito.descritor_arquivo, requisito.posicao, &mut buffer, requisito.size as usize, &mut stream);
+                            self.escreve(request, &mut stream);
                         },
                         RequestType::Fecha => {
-                            self.fecha(requisito.descritor_arquivo, &mut stream);
+                            self.fecha(request, &mut stream);
                         }
                     };
                 }
