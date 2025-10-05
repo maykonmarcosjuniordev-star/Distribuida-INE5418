@@ -35,6 +35,7 @@ impl FileManager {
             
         let file_path = format!("{}{}", FILES_PATH, clean_filename);
         
+        println!("Opening file at path: {}", file_path);
         let file: File = match OpenOptions::new()
             .create(true)
             .read(true)     // Add read permission
@@ -63,9 +64,11 @@ impl FileManager {
     pub fn le(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         match self.file_table.get(&descritor_arquivo) {
             Some(file) => {
-                match  file.read_exact_at(buffer[..tamanho].as_mut(), posicao) {
-                    Ok(_) => {
-                        buffer.len() as i32
+                println!("Reading {} bytes from file {} at position {}", tamanho, descritor_arquivo, posicao);
+                match  file.read_at(buffer[..tamanho].as_mut(), posicao) {
+                    Ok(bytes_read) => {
+                        // buffer.len() as i32
+                        bytes_read as i32
                     }
                     Err(e) => {
                         println!("Erro ao ler arquivo {}: {}", descritor_arquivo, e);
@@ -95,6 +98,7 @@ impl FileManager {
     pub fn escreve(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         match self.file_table.get(&descritor_arquivo) {
             Some(file) => {
+                println!("Writing {} bytes to file {} at position {}", tamanho, descritor_arquivo, posicao);
                 match  file.write_all_at(buffer[..tamanho].as_mut(), posicao) {
                     Ok(_) => {
                         buffer.len() as i32
@@ -117,6 +121,7 @@ impl FileManager {
             return -1;
         }
         // fecha o arquivo
+        println!("Closing file {}", descritor_arquivo);
         match self.file_table.remove(&descritor_arquivo) {
             Some(f) => {
                 drop(f);

@@ -23,6 +23,7 @@ pub struct Request {
     pub descritor_arquivo: i32,
     pub posicao: u64,
     pub size: u32,
+    pub client_id: u32,
     pub data: Vec<u8>,
 }
 
@@ -39,9 +40,10 @@ impl Request {
         // Expected layout:
         // [0]                 -> request_type (1 byte)
         // [1..5]              -> descritor_arquivo (4 bytes, big-endian)
-        // [5..9]              -> posicao (4 bytes, big-endian)
-        // [9..13]             -> size (4 bytes, big-endian)
-        // [13..]              -> data (remaining bytes)
+        // [5..13]              -> posicao (4 bytes, big-endian)
+        // [13..17]             -> size (4 bytes, big-endian)
+        // [17..21]            -> client_id (4 bytes, big-endian)
+        // [21..]              -> data (remaining bytes)
         let request_type = match buffer[0] {
             0 => RequestType::Abre,
             1 => RequestType::Le,
@@ -52,12 +54,14 @@ impl Request {
         let descritor_arquivo = i32::from_be_bytes(buffer[1..5].try_into().expect("Failed to parse descritor_arquivo"));
         let posicao = u64::from_be_bytes(buffer[5..13].try_into().expect("Failed to parse posicao"));
         let size = u32::from_be_bytes(buffer[13..17].try_into().expect("Failed to parse size"));
-        let data = buffer[17..(17 + (size as usize))].to_vec();
+        let client_id = u32::from_be_bytes(buffer[17..21].try_into().expect("Failed to parse client_id"));
+        let data = buffer[21..(21 + (size as usize))].to_vec();
         Request {
             request_type,
             descritor_arquivo,
             posicao,
             size,
+            client_id,
             data,
         }
     }
@@ -67,6 +71,7 @@ impl Request {
         buffer.extend(&response.descritor_arquivo.to_be_bytes());
         buffer.extend(&response.posicao.to_be_bytes());
         buffer.extend(&response.size.to_be_bytes());
+        buffer.extend(&response.client_id.to_be_bytes());
         buffer.extend(response.data);
         buffer
     }
