@@ -64,9 +64,9 @@ impl FileManager {
     pub fn le(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         match self.file_table.lock().expect("Failed to lock file table").get(&descritor_arquivo) {
             Some(file) => {
-                match  file.read_exact_at(buffer[..tamanho].as_mut(), posicao) {
-                    Ok(_) => {
-                        buffer.len() as i32
+                match  file.read_at(buffer[..tamanho].as_mut(), posicao) {
+                    Ok(size) => {
+                        size as i32
                     }
                     Err(e) => {
                         println!("Erro ao ler arquivo {}: {}", descritor_arquivo, e);
