@@ -34,41 +34,47 @@ impl Agent {
                 return;
             },
         }
+        let mut data = format!("Hello {} from agent {}\n", 0, self.id);
+        let tamanho = data.as_bytes().to_vec().len();
 
-        // Write to file
-        let data = format!("Hello from agent {}\n", self.id);
-        println!("Agent {} writing {} to file {}", self.id, data, filename);
-        let buffer = data.as_bytes().to_vec();
-        let tamanho = buffer.len();
-        let mut posicao = 0;
-        for _ in 0..2 {
-            match self.client.escreve(fd, posicao, &buffer, tamanho) {
-                0 => {
-                    println!("Agent {} wrote {} to file {}", self.id, data, filename);
-                    posicao += tamanho as u64;
-                },
-                i => {
-                    println!("Error: Agent {} failed to write to file {}: {}, reopening", self.id, filename, i);
-                    self.client.abre(fd, filename.clone());
-                },
+        for t in 0..2 { // Repeat the write/read cycle twice
+            let mut posicao = 0;
+            // Write to file
+            for w in 0..2 {
+                data = format!("Hello {} from agent {}\n", w + t * 2, self.id);
+                println!("Agent {} writing {} to file {}", self.id, data, filename);
+                let buffer = data.as_bytes().to_vec();
+                match self.client.escreve(fd, posicao, &buffer, tamanho) {
+                    0 => {
+                        println!("Agent {} wrote {} to file {}", self.id, data, filename);
+                        posicao += tamanho as u64;
+                    },
+                    i => {
+                        println!("Error: Agent {} failed to write to file {}: {}, reopening", self.id, filename, i);
+                        self.client.abre(fd, filename.clone());
+                    },
+                }
             }
-        }
-        
-        // Read from file
-        for _ in 0..2 {
-            let mut buffer = vec![];
-            println!("Agent {} reading from file {}", self.id, filename);
-            match self.client.le(fd, 0, &mut buffer, tamanho) {
-                -1 => {
-                    println!("Error: Agent {} failed to read from file {}", self.id, filename);
-                    self.client.abre(fd, filename.clone());
-                },
-                size => {
-                    let msg = String::from_utf8_lossy(&buffer[..size as usize]);
-                    println!("Agent {} read {} bytes: {:?}", self.id, size, msg);
-                    posicao += tamanho as u64;
-                },
+            for _ in 0..2 { // Read from file twice
+                posicao = 0; // Reset position for reading
+                // Read from file
+                for _ in 0..2 {
+                    let mut buffer = vec![];
+                    println!("Agent {} reading from file {}", self.id, filename);
+                    match self.client.le(fd, posicao, &mut buffer, tamanho) {
+                        -1 => {
+                            println!("Error: Agent {} failed to read from file {}", self.id, filename);
+                            self.client.abre(fd, filename.clone());
+                        },
+                        size => {
+                            let msg = String::from_utf8_lossy(&buffer[..size as usize]);
+                            println!("Agent {} read {} bytes: {:?}", self.id, size, msg);
+                            posicao += tamanho as u64;
+                        },
+                    }
+                }
             }
+            println!("\n--- Agent {} completed a write/read cycle on file {}", self.id, filename);
         }
 
         // Close file
