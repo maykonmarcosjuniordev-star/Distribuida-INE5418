@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <unistd.h>
 #include <sys/select.h>
+#include <iostream>
 
 
 using namespace std;
@@ -53,26 +54,32 @@ public:
     struct sockaddr_in server_address;
     int client_socket;
 
-    void setup() {
+    Client() {}
+
+    Client(unsigned int Porta, const string server) {
         client_socket = socket(AF_INET, SOCK_STREAM, 0);
         server_address.sin_family = AF_INET;
-        server_address.sin_port = htons(8080); // E a porta?
-        server_address.sin_addr.s_addr = inet_addr("127.0.0.1"); // Como fazer o IP do servidor?
+        server_address.sin_port = htons(Porta);
+        server_address.sin_addr.s_addr = inet_addr(server.c_str());
     }
 
-    int sendServer(vector<char> buffer, struct Request rqst) {
+    int sendServer(vector<char> &buffer, struct Request rqst) {
         int result;
         int len = sizeof(server_address);
         result = connect(client_socket, (struct sockaddr *)&server_address, len);
         if (result == -1) {
-            perror("AAAAAAAAAAAAAAAAAAAAAAAAA"); // TODO
+            perror("Connection unsuccesful!");
             return -1;
         }
+        
+        vector<char> message = serialize(rqst);
+        for (int c : message) cout << c << endl;
+        cout << endl;
+        write(client_socket, message.data(), message.size());
+        buffer.resize(BUFFER_SIZE);
+        read(client_socket, buffer.data(), BUFFER_SIZE);
 
-        write(client_socket, &rqst, sizeof(rqst));
-        read(client_socket, &buffer, BUFFER_SIZE);
-
-        close(client_socket);
+        return 0;
     }
 
     int abre(int descritor_arquivo, string nome_arquivo) {
@@ -86,7 +93,11 @@ public:
         
         
         vector<char> buffer;
-        sendServer(buffer, rqst);
+        int result = sendServer(buffer, rqst);
+
+        if (result == -1) {
+            return result;
+        }
 
         Response rsp = desserialize(buffer);
         return rsp.response_type;
@@ -102,7 +113,11 @@ public:
         
         
         vector<char> buffer;
-        sendServer(buffer, rqst);
+        int result = sendServer(buffer, rqst);
+
+        if (result == -1) {
+            return result;
+        }
 
         Response rsp = desserialize(buffer);
         return rsp.response_type;
@@ -116,9 +131,12 @@ public:
         rqst.size = tamanho;
         rqst.data = buffer;
 
-
-        sendServer(buffer, rqst);
-
+        int result = sendServer(buffer, rqst);
+        
+        if (result == -1) {
+            return result;
+        }
+        
         struct Response rsp = desserialize(buffer);
         return rsp.response_type;
     }
@@ -146,7 +164,11 @@ public:
         rqst.size = tamanho;
         rqst.data = {};
 
-        sendServer(buffer, rqst);
+        int result = sendServer(buffer, rqst);
+
+        if (result == -1) {
+            return result;
+        }
 
         Response rsp = desserialize(buffer);
 
@@ -220,13 +242,25 @@ public:
 
 
 
-    // int serialize(struct Request &rqst) { // Do we need this?
-    //     int32_t byte0 = htonl(rqst.request_type);
-    //     int32_t byte4 = htonl(rqst.descritor_arquivo);
-    //     int32_t byte8 = htonl(rqst.posicao);
-    //     int32_t byte12 = htonl(rqst.size);
-    //     int32_t byte16e = htonl((int32_t)rqst.data.size());
-    // }
+
+    vector<char> serialize(Request &rqst) {
+        vector<char> buffer;
+
+        // lambda sinistro
+        auto appendBytes = [&](auto value) {
+            using T = decltype(value);
+            for (size_t i = 0; i < sizeof(T); ++i)
+                buffer.push_back(static_cast<char>((value >> (8 * (sizeof(T) - 1 - i))) & 0xFF));
+        };
+
+        appendBytes(rqst.request_type);
+        appendBytes(rqst.descritor_arquivo);
+        appendBytes(rqst.posicao);
+        appendBytes(rqst.size);
+        buffer.insert(buffer.end(), rqst.data.begin(), rqst.data.end());
+        
+        return buffer;
+    }
 
     struct Response desserialize(vector<char> buffer) {
         struct Response rsp;
@@ -275,7 +309,3 @@ public:
     }
 };
 
-
-// int main() {
-
-// }
