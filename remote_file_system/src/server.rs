@@ -197,7 +197,7 @@ impl Server {
         loop {
             match listener.accept() {
                 Ok((mut stream, current_client)) => {
-                    let mut buffer_socket = vec![0; 1024];
+                    let mut buffer_socket = vec![0; BUFFER_SIZE];
                     let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
                     let request = Request::desserialize(&buffer_socket);
                     

@@ -17,34 +17,39 @@ public:
         while (i--) {
             string nome_arquivo = "file.txt";
             int id_file = 0;
-            string text = "Hello from agent " + to_string(id) + "\n";
+            int posicao = 0;
+            string text = "Hello from agent cpp\n";
             vector<char> buffer(text.begin(), text.end());
+            unsigned int tamanho = buffer.size()*4;
 
+            printf("Agent %i trying to open file %s\n", id, nome_arquivo.c_str());
             if (cliente.abre(id_file, nome_arquivo) == 0) {
-                printf("Agent %i opened file %s", id, nome_arquivo.c_str());
+                printf("Agent %i opened file %s\n", id, nome_arquivo.c_str());
             } else {
                 printf("Error, couldn't open file.\n");
                 continue;
             }
+            printf("Agent %i writing to file %i: %s\n", id, id_file, text.c_str());
             if (cliente.escreve(id_file, 0, buffer, buffer.size()) == 0) {
-                printf("Written!");
+                printf("Written!\n");
             } else {
-                printf("Something went wrong.");
+                printf("Error, couldn't write to file.\n");
                 continue;
             }
-            int result = cliente.le(id_file, 0, buffer, 1024);
-            string readed(buffer.begin(), buffer.end());
-            if (result >= 0) {
-                printf("Agent %i read %i bytes from file %i: %s", id, result, id_file, readed.c_str());
+            printf("Agent %i reading from file %i\n", id, id_file);
+            buffer.clear();
+            if (cliente.le(id_file, 0, buffer, buffer.size()) >= 0) {
+                string readed(buffer.begin(), buffer.end());
+                printf("Agent %i read %i bytes from file %i: %s\n", id, readed.size(), id_file, readed.c_str());
             } else {
-                printf("Error, couldn't read file.");
+                printf("Error, couldn't read file.\n");
                 continue;
             }
             if (cliente.fecha(id_file) == 0) {
-                printf("Agent closed file %i", id_file);
+                printf("Agent closed file %i\n", id_file);
                 break;
             } else {
-                printf("Error, couldn't read file.");
+                printf("Error, couldn't close file.\n");
             }
         }
     }
@@ -55,6 +60,6 @@ public:
 
 
 int main(int argc, char* argv[]) {
-    Agent agente = Agent("127.0.0.1", 8080, "127.0.0.1", 8081);
+    Agent agente = Agent("127.0.0.1", 8080, "127.0.0.1", 8070);
     agente.run();
 }

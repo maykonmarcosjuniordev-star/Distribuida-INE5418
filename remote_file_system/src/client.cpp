@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <type_traits>
 #include <stdexcept>
 #include <iostream>
 
@@ -40,7 +41,7 @@ enum ResponseType {
 struct Request {
     enum RequestType request_type;
     int descritor_arquivo;
-    unsigned long long posicao;
+    unsigned long posicao;
     unsigned int size;
     vector<char> data;
 };
@@ -55,56 +56,57 @@ public:
     vector<CacheItem> cache;
     struct sockaddr_in server_address;
     struct sockaddr_in client_address;
-    int client_socket;
-    int warning_socket;
     
     Client() {}
     
     Client(const string server, unsigned int server_port, const string client, unsigned int client_port) {
-        client_socket = socket(AF_INET, SOCK_STREAM, 0);
-        // binds client socket to client address
+        // configure client address
         client_address.sin_family = AF_INET;
         client_address.sin_port = htons(client_port);
-        bind(client_socket, (struct sockaddr*)&client_address, sizeof(client_address));
-        warning_socket = socket(AF_INET, SOCK_DGRAM, 0);
-        // binds warning socket to client address
-        bind(warning_socket, (struct sockaddr*)&client_address, sizeof(client_address));
-        // set timeout for warning socket
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 5; // 5 us = 5 ms
-        setsockopt(warning_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+        client_address.sin_addr.s_addr = inet_addr(client.c_str());
         // configure server address
         server_address.sin_family = AF_INET;
         server_address.sin_port = htons(server_port);
         server_address.sin_addr.s_addr = inet_addr(server.c_str());
     }
 
-    int sendServer(vector<char> &buffer, struct Request rqst) {
-        int result;
-        int len = sizeof(server_address);
-
+    int sendServer(vector<char> &buffer, struct Request& rqst) {
+        // create socket
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock < 0) {
+            perror("Socket creation failed");
+            return -1;
+        }
+        // set socket options to reuse address
+        int opt = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        // bind to client address
+        if (bind(sock, (sockaddr*)&client_address, sizeof(client_address)) < 0) {
+            close(sock);
+            perror("Binding client socket failed");
+            return -1;
+        }
         // connect to server
-        result = connect(client_socket, (struct sockaddr *) &server_address, len);
-        if (result < 0) {
+        if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
+            close(sock);
             perror("Connection to server failed");
             return -1;
         }
         
-        vector<char> message = serialize(rqst);
+        vector<uint8_t> message = serialize(rqst);
+        // printf("Sending message to server: ");
+        // for (auto byte : message) {
+        //     printf("%u ", byte);
+        // }
+        // printf("\n");
         // converts to string and prints
-        printf("Sending message to server: ");
-        for (char c : message) {
-            printf("%c", c);
-        }
-        printf("\n");
-        write(client_socket, message.data(), message.size());
+        write(sock, message.data(), message.size());
         
         buffer.resize(BUFFER_SIZE);
 
-        socklen_t recv_len = sizeof(server_address);
         printf("Waiting for response from server...\n");
-        read(client_socket, buffer.data(), BUFFER_SIZE);
+        read(sock, buffer.data(), BUFFER_SIZE);
+        close(sock);
         printf("Response received from server.\n");
 
         return 0;
@@ -115,11 +117,10 @@ public:
         rqst.request_type = RequestType::ABRE;
         rqst.descritor_arquivo = descritor_arquivo;
         rqst.posicao = 0;
-        rqst.size = 0;
         vector<char> data(nome_arquivo.begin(), nome_arquivo.end());
         rqst.data = data;
-        // reconverts data to string and prints
-        
+        rqst.size = data.size();
+
         vector<char> buffer;
         int result = sendServer(buffer, rqst);
 
@@ -189,7 +190,7 @@ public:
         rqst.request_type = RequestType::LE;
         rqst.descritor_arquivo = descritor_arquivo;
         rqst.posicao = posicao;
-        rqst.size = tamanho;
+        rqst.size = 0;
         rqst.data = {};
 
         int result = sendServer(buffer, rqst);
@@ -199,6 +200,10 @@ public:
         }
 
         Response rsp = desserialize(buffer);
+        // for (auto byte : rsp.data) {
+        //     printf("%u ", static_cast<uint8_t>(byte));
+        // }
+        // printf("\n");
 
         if (rsp.response_type == ResponseType::OK) {
             CacheItem item;
@@ -219,6 +224,27 @@ public:
 
 
     int verify_cache(CacheItem checkItem) {
+        int warning_socket = socket(AF_INET, SOCK_DGRAM, 0);
+        if (warning_socket < 0) {
+            perror("Warning socket creation failed");
+            return -1;
+        }
+        // binds warning socket to client address
+        if (bind(warning_socket, (struct sockaddr*)&client_address, sizeof(client_address)) < 0) {
+            perror("Warning socket bind failed");
+            close(warning_socket);
+            return -1;
+        }
+        // set timeout for warning socket
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 5; // 5 us = 5 ms
+        if (setsockopt(warning_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
+            perror("Setting socket options failed");
+            close(warning_socket);
+            return -1;
+        }
+
         socklen_t recv_len = sizeof(server_address);
         vector<char> buffer;
         int invalidated = 0;
@@ -253,40 +279,57 @@ public:
                 return -1;
             }
         }
+        close(warning_socket);
         return invalidated;
     }
 
 
 
+    vector<uint8_t> serialize(Request &rqst) {
+        vector<uint8_t> buffer;
 
-    vector<char> serialize(Request &rqst) {
-        vector<char> buffer;
-
-        // lambda sinistro
+        // appendBytes: cast to unsigned type of the value then emit big-endian bytes
         auto appendBytes = [&](auto value) {
             using T = decltype(value);
-            for (size_t i = 0; i < sizeof(T); ++i)
-                buffer.push_back(static_cast<char>((value >> (8 * (sizeof(T) - 1 - i))) & 0xFF));
+            using U = std::make_unsigned_t<T>;
+            U v = static_cast<U>(value);
+            for (size_t i = 0; i < sizeof(T); ++i) {
+                uint8_t byte = static_cast<uint8_t>((v >> (8 * (sizeof(T) - 1 - i))) & 0xFF);
+                buffer.push_back(byte);
+            }
         };
 
-        appendBytes(rqst.request_type);
-        appendBytes(rqst.descritor_arquivo);
-        appendBytes(rqst.posicao);
-        appendBytes(rqst.size);
-        buffer.insert(buffer.end(), rqst.data.begin(), rqst.data.end());
+        // serialize using explicit casts to well-defined sizes to match wire format expectations
+        appendBytes(static_cast<uint8_t>(rqst.request_type));
+        appendBytes(static_cast<int32_t>(rqst.descritor_arquivo));
+        appendBytes(static_cast<uint64_t>(rqst.posicao));
+        appendBytes(static_cast<uint32_t>(rqst.size));
+        for (char byte : rqst.data) {
+            appendBytes(byte);
+        }
         
         return buffer;
     }
 
     struct Response desserialize(vector<char> buffer) {
         struct Response rsp;
-        uint32_t b0 = static_cast<uint8_t>(buffer[0]);
-        uint32_t b1 = static_cast<uint8_t>(buffer[1]);
-        uint32_t b2 = static_cast<uint8_t>(buffer[2]);
-        uint32_t b3 = static_cast<uint8_t>(buffer[3]);
-        int type = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+        // gets only the first byte of the first char
+        uint8_t type = static_cast<uint8_t>(buffer[0]) && 0xFF;
         rsp.response_type = static_cast<ResponseType>(type);
-        copy(buffer.begin() + 4, buffer.end(), back_inserter(rsp.data));
+        for (auto chars : buffer) {
+            int32_t chars_int = static_cast<int32_t>(chars);
+            // break int into 4 bytes
+            uint8_t b0 = static_cast<uint8_t>(chars_int);
+            uint8_t b1 = static_cast<uint8_t>(chars_int >> 8);
+            uint8_t b2 = static_cast<uint8_t>(chars_int >> 16);
+            uint8_t b3 = static_cast<uint8_t>(chars_int >> 24);
+            rsp.data.push_back(static_cast<char>(b0));
+            rsp.data.push_back(static_cast<char>(b1));
+            rsp.data.push_back(static_cast<char>(b2));
+            rsp.data.push_back(static_cast<char>(b3));
+        }
+        // removes the first byte from data
+        rsp.data.erase(rsp.data.begin());
         return rsp;
     }
 
