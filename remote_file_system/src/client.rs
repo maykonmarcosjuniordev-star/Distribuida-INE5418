@@ -95,12 +95,13 @@ impl Client {
         println!("Cache invalidation for file descriptor {} at position {}", descriptor, pos);
         let end = pos + size as u64;
         if let Ok(mut c) = self.cache.lock() {
-            println!("Current cache size: {}", c.len());
-            let _ = c.extract_if(|item|
+            print!("Current cache size: {} --> ", c.len());
+            c.extract_if(|item|
                 item.descritor_arquivo == descriptor
                 && (item.start <= end
                     && item.end >= pos)
-                );
+                ).for_each(drop);
+            println!("New cache size: {}", c.len());
         }
     }
 
