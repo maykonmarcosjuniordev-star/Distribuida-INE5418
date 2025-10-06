@@ -86,8 +86,27 @@ impl Server {
         }
     }
 
+    fn has_open(&self, request: &Request, client: &mut TcpStream) -> bool {
+        // verify if the file is being watched, by the client, if not, return error
+        if let Ok(watchers) = self.file_watchers.lock() {
+            if let Some(usrs) = watchers.get(&request.descritor_arquivo) {
+                let addr = client.peer_addr().expect("Failed to get client address");
+                if !usrs.contains(&addr) {
+                    println!("Client {} is not watching file {}", addr, request.descritor_arquivo);
+                    let response = self.response_factory.create_error_response(-1);
+                    Self::send(response, client);
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
     /// Chama o file manager para ler o arquivo e envia o buffer para o cliente
     pub fn le(&self, request: Request, client: &mut TcpStream) {
+        if !self.has_open(&request, client) {
+            return;
+        }
         let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];
         match self.files.le(request.descritor_arquivo, request.posicao, &mut buffer, request.tamanho as usize) {
             -1 => {
@@ -105,6 +124,9 @@ impl Server {
     /// Chama o file manager para escrever no arquivo.
     /// Invalida os caches dos outros clientes que possuem o arquivo aberto
     pub fn escreve(&self, request: Request, client: &mut TcpStream) {
+        if !self.has_open(&request, client) {
+            return;
+        }
         let mut buffer = request.data;
         match self.files.escreve(request.descritor_arquivo, request.posicao, &mut buffer, request.tamanho as usize) {
             -1 => {
@@ -138,6 +160,9 @@ impl Server {
     /// Chama o file manager para fechar o arquivo
     /// Remove o cliente da lista de usuários do arquivo
     pub fn fecha(&self, request: Request, client: &mut TcpStream) {
+        if !self.has_open(&request, client) {
+            return;
+        }
         match self.files.fecha(request.descritor_arquivo) {
             0 => {
                 let addr = client.peer_addr().expect("Failed to get client address");
