@@ -141,16 +141,16 @@ impl Server {
                         request.tamanho as usize
                     );
                 self.send_warning(response, request.descritor_arquivo);
-                let addr = client
-                    .peer_addr()
-                    .expect("Failed to get client address");
-                // mantém apenas o cliente que fez a escrita na lista de usuários
-                self.file_watchers
-                    .lock()
-                    .expect("Failed to lock file watchers")
-                    .get_mut(&request.descritor_arquivo)
-                    .expect("File not found")
-                    .retain(|&x| x == addr);
+                // let addr = client
+                //     .peer_addr()
+                //     .expect("Failed to get client address");
+                // // mantém apenas o cliente que fez a escrita na lista de usuários
+                // self.file_watchers
+                //     .lock()
+                //     .expect("Failed to lock file watchers")
+                //     .get_mut(&request.descritor_arquivo)
+                //     .expect("File not found")
+                //     .retain(|&x| x == addr);
                 let response = self.response_factory.create_success_response(i.to_be_bytes().to_vec());
                 Self::send(response, client);
             },
@@ -163,16 +163,24 @@ impl Server {
         if !self.has_open(&request, client) {
             return;
         }
+        if let Ok(mut watchers) = self.file_watchers.lock() {
+            if let Some(usrs) = watchers.get_mut(&request.descritor_arquivo) {
+                if usrs.len() > 1 {
+                    // else, just remove the client from the list
+                    let addr = client.peer_addr().expect("Failed to get client address");
+                    usrs.retain(|&x| x != addr);
+                    // if there are still users, do not close the file
+                    return;
+                }
+            }
+        }
+        // if the client is the last one, remove the entry
         match self.files.fecha(request.descritor_arquivo) {
             0 => {
-                let addr = client.peer_addr().expect("Failed to get client address");
-                self.file_watchers
-                    .lock()
-                    .expect("Failed to lock file watchers")
-                    .get_mut(&request.descritor_arquivo)
-                    .expect("File not found")
-                    .retain(|&x| x != addr);
-
+                // remove the entry from the watchers
+                if let Ok(mut watchers) = self.file_watchers.lock() {
+                    watchers.remove(&request.descritor_arquivo);
+                }
             },
             i => {
                 println!("Server failed to close file {}: Error {}", request.descritor_arquivo, i);
@@ -221,25 +229,23 @@ impl Server {
                     let current_client = stream.peer_addr().expect("Failed to get client address");
                     let mut buffer_socket = vec![0; 1024];
                     let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
-                    println!("Server Received {} bytes from {}", amt, current_client);
-                    let mut buffer_vect = vec![];
                     let request = Request::desserialize(&buffer_socket);
-        
-                    for i in 0..amt {
-                        buffer_vect.push(buffer_socket[i].clone());
-                    }
-        
+                    
                     match request.request_type {
                         RequestType::Abre => {
+                            println!("Server Received a Open Request with {} bytes from {}", amt, current_client);
                             self.abre(request, &mut stream);
                         },
                         RequestType::Le => {
+                            println!("Server Received a Read Request with {} bytes from {}", amt, current_client);
                             self.le(request, &mut stream);
                         },
                         RequestType::Escreve => {
+                            println!("Server Received a Write Request with {} bytes from {}", amt, current_client);
                             self.escreve(request, &mut stream);
                         },
                         RequestType::Fecha => {
+                            println!("Server Received a Close Request with {} bytes from {}", amt, current_client);
                             self.fecha(request, &mut stream);
                         }
                     };

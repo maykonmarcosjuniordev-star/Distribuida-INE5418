@@ -92,6 +92,7 @@ impl Client {
     fn invalidate_cache(&self, response: &Response) {
         // invalida o dado na cache
         let (descriptor, pos, size) = Response::parse_atualiza_cache(response);
+        println!("Cache invalidation for file descriptor {} at position {}", descriptor, pos);
         let end = pos + size as u64;
         if let Ok(mut c) = self.cache.lock() {
             println!("Current cache size: {}", c.len());
@@ -101,7 +102,6 @@ impl Client {
                     && item.end >= pos)
                 );
         }
-        println!("Cache invalidation for file descriptor {} at position {}", descriptor, pos);
     }
 
     /// checa se a cache não está inválida
@@ -222,7 +222,7 @@ impl Client {
     /// Escreve no arquivo no servidor remoto
     /// Retorna 0 se sucesso, -1 se erro
     pub fn escreve(&self, descritor_arquivo: i32, posicao: u64,
-                    buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
+                    buffer: &Vec<u8>, tamanho: usize) -> i32 {
         // cria a requisição
         let request = self.request_factory.create_write_request(descritor_arquivo, posicao, buffer, tamanho);
         // envia a requisição para o servidor e aguarda a resposta
