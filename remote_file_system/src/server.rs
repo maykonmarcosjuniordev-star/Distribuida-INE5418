@@ -2,10 +2,16 @@ use std::io::{Write, Read};
 use std::net::{UdpSocket, IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use std::vec;
 
 use crate::file_manager::FileManager;
 use crate::protocol::{Request, Response, RequestType, StandardResponseFactory, ResponseFactory, BUFFER_SIZE};
+
+struct RateLimiter {
+    pub number_of_requests: u32,
+    pub first_request: Duration,
+}
 
 pub struct Server {
     files: FileManager,
@@ -13,6 +19,7 @@ pub struct Server {
     /// Map of file descriptors, in each position are the clients using it.
     file_watchers: Mutex<HashMap<i32, Vec<SocketAddr>>>,
     response_factory: StandardResponseFactory,
+    throttle: Mutex<HashMap<SocketAddr, RateLimiter>>,
 }
 
 impl Server {
@@ -22,7 +29,8 @@ impl Server {
         let address = SocketAddr::new(IpAddr::V4(ip), port);
         let file_watchers = Mutex::new(HashMap::new());
         let response_factory = StandardResponseFactory;
-        Self {files, address, file_watchers, response_factory}
+        let throttle = Mutex::new(HashMap::new());
+        Self {files, address, file_watchers, response_factory, throttle}
     }
     
     pub fn get_address(&self) -> SocketAddr {
@@ -194,9 +202,28 @@ impl Server {
         println!("Server listening on {}", self.address);
         let listener = TcpListener::bind(self.address).expect("Failed to bind server address");
         // accept connections and process them serially
+        let start_time = Instant::now();
         loop {
             match listener.accept() {
                 Ok((mut stream, current_client)) => {
+                    if let Ok(mut throttle) = self.throttle.lock() {
+                        let entry = throttle.entry(current_client).or_insert(RateLimiter {
+                            number_of_requests: 0,
+                            first_request: start_time.elapsed(),
+                        });
+                        entry.number_of_requests += 1;
+                        let elapsed = start_time.elapsed() - entry.first_request;
+                        if elapsed.as_secs() >= 1 {
+                            // reset the counter
+                            entry.number_of_requests = 1;
+                            entry.first_request = start_time.elapsed();
+                        } else if entry.number_of_requests > 5 {
+                            println!("Throttling client {}: too many requests", current_client);
+                            let response = self.response_factory.create_error_response(-1);
+                            Self::send(response, &mut stream);
+                            continue;
+                        }                        
+                    }
                     let mut buffer_socket = vec![0; BUFFER_SIZE];
                     let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
                     let request = Request::desserialize(&buffer_socket);
