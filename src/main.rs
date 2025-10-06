@@ -16,8 +16,18 @@ fn main() {
             server.run();
         })
     };
+    // checks the command line arguments for number of agents
+    let mut num_agents = 0; // default
+    if let Some(arg) = std::env::args().nth(1) {
+        if let Ok(n) = arg.parse::<u32>() {
+            if n > 0 {
+                println!("Creating {} agents", n);
+                num_agents = n;
+            }
+        }
+    }
     let mut agents_handles = vec![];
-    for i in 0..2 {
+    for i in 0..num_agents {
         let addr = format!("127.0.0.1:{}", 8081 + i).parse().expect("Failed to parse agent address");
         println!("Creating agent {} on address {}", i, addr);
         let agent = Agent::new(i, &server_addr, addr);

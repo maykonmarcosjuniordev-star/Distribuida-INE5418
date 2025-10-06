@@ -1,7 +1,6 @@
-use std::io::{Write, Read, ErrorKind::WouldBlock};
+use std::io::{Write, Read};
 use std::net::{UdpSocket, IpAddr, Ipv4Addr, SocketAddr, TcpStream, TcpListener};
 use std::collections::HashMap;
-use std::time::{Instant, Duration};
 use std::sync::Mutex;
 use std::vec;
 
@@ -195,38 +194,9 @@ impl Server {
         println!("Server listening on {}", self.address);
         let listener = TcpListener::bind(self.address).expect("Failed to bind server address");
         // accept connections and process them serially
-        // with a 1000 ms timeout
-        listener.set_nonblocking(true).expect("Failed to set non-blocking");
-        let timeout = Duration::from_millis(1000);
-        let mut last_activity = Instant::now();
         loop {
-            // try to accept a connection (non-blocking)
-            let stream = match listener.accept() {
-            Ok((s, _addr)) => {
-                // got a connection, reset inactivity timer and provide Ok(TcpStream)
-                last_activity = Instant::now();
-                Ok(s)
-            }
-            Err(ref e) if e.kind() == WouldBlock => {
-                // no connection available right now
-                if last_activity.elapsed() >= timeout {
-                    // no activity for the timeout period -> break the loop
-                    println!("Server timed out due to inactivity.");
-                    break;
-                }
-                // avoid busy-looping
-                std::thread::sleep(Duration::from_millis(50));
-                continue;
-            }
-            Err(e) => {
-                // an actual error occurred while accepting
-                println!("Error accepting connection: {}", e);
-                Err(e)
-            }
-            };
-            match stream {
-                Ok(mut stream) => {
-                    let current_client = stream.peer_addr().expect("Failed to get client address");
+            match listener.accept() {
+                Ok((mut stream, current_client)) => {
                     let mut buffer_socket = vec![0; 1024];
                     let amt = stream.read(&mut buffer_socket).expect("Failed to read from socket");
                     let request = Request::desserialize(&buffer_socket);
@@ -249,7 +219,7 @@ impl Server {
                             self.fecha(request, &mut stream);
                         }
                     };
-                }
+                },
                 Err(e) => {
                     println!("Error Receiving Connections: {}", e);
                 }
