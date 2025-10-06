@@ -51,13 +51,13 @@ struct Response {
 class Client {
 public:
     vector<CacheItem> cache;
-    struct sockaddr_in server_address;
+    struct sockaddr_un server_address;
     int client_socket;
-
+    
     Client() {}
-
+    
     Client(unsigned int Porta, const string server) {
-        client_socket = socket(AF_INET, SOCK_STREAM, 0);
+        client_socket = socket(AF_INET, SOCK_DGRAM, 0);
         server_address.sin_family = AF_INET;
         server_address.sin_port = htons(Porta);
         server_address.sin_addr.s_addr = inet_addr(server.c_str());
@@ -66,18 +66,14 @@ public:
     int sendServer(vector<char> &buffer, struct Request rqst) {
         int result;
         int len = sizeof(server_address);
-        result = connect(client_socket, (struct sockaddr *)&server_address, len);
-        if (result == -1) {
-            perror("Connection unsuccesful!");
-            return -1;
-        }
-        
+
         vector<char> message = serialize(rqst);
-        for (int c : message) cout << c << endl;
-        cout << endl;
-        write(client_socket, message.data(), message.size());
+        sendto(client_socket, message.data(), message.size(), 0, (struct sockaddr *) &server_address, sizeof(server_address))
+
         buffer.resize(BUFFER_SIZE);
-        read(client_socket, buffer.data(), BUFFER_SIZE);
+
+        socklen_t recv_len = sizeof(server_address);
+        recvfrom(client_socket, buffer.data(), BUFFER_SIZE, 0, (struct sockaddr *) &server_address, &recv_len);
 
         return 0;
     }
@@ -191,26 +187,14 @@ public:
 
     int verify_cache(CacheItem checkItem) {
         int result;
-        result = connect(client_socket, (struct sockaddr *)&server_address, sizeof(server_address));
-        if (result == -1) {
-            perror("AAAAAAAAAAAAAAAAAAAAAAAAA"); // TODO
-            return -1;
-        }
-        
-        
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(client_socket, &readfds);
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 0;
 
-        int activity = select(client_socket + 1, &readfds, NULL, NULL, &timeout);
+        socklen_t recv_len = sizeof(server_address);
+        vector<char> buffer;
+        recvfrom(client_socket, buffer.data(), 24, MSG_DONTWAIT, (struct sockaddr *) &server_address, &recv_len);
+
 
         int invalidated = 0;
-        vector<char> buffer;
-        while (activity > 0 && FD_ISSET(client_socket, &readfds)) {
-            read(client_socket, &buffer, 24);
+        while (buffer.size() > 0) {
             struct Response rsp = desserialize(buffer);
 
             if (rsp.response_type == CACHE_UPDATE) {
@@ -232,10 +216,12 @@ public:
                             (item.start >= posicao + sizee && posicao + sizee <= item.end)
                         );
                 });
+            } else {
+                cout << "Mensagem inesperada recebida durante verificação da cache: " << rsp.response_type << endl;
+                return -1;
             }
 
-
-            int activity = select(client_socket + 1, &readfds, NULL, NULL, &timeout);
+            recvfrom(client_socket, buffer.data(), 24, MSG_DONTWAIT, (struct sockaddr *) &server_address, &recv_len);
         }
         return invalidated;
     }
