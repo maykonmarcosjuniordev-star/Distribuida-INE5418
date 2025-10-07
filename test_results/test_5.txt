@@ -1,0 +1,52 @@
+Starting Test 5: Large write and read test with cache coherence and overlap.
+Creating agent 0 on address 127.0.0.1:8081
+Creating agent 1 on address 127.0.0.1:8082
+[Client 0]: Opening file file.txt with descriptor 0
+[SERVER]: Server Received a Open Request with 25 bytes from 127.0.0.1:8081
+[Client 0]: Successfully opened file with descriptor 0
+[Client 1]: Opening file file.txt with descriptor 0
+[SERVER]: Server Received a Open Request with 25 bytes from 127.0.0.1:8082
+[Client 1]: Successfully opened file with descriptor 0
+[Client 0]: Writing 512 bytes to file descriptor 0 at position 0
+[SERVER]: Server Received a Write Request with 529 bytes from 127.0.0.1:8081
+[SERVER]: Sending cache invalidation for file 0 from position 0 for 512 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[Client 0]: Successfully wrote to file descriptor 0
+[Client 1]: Reading 64 bytes from file descriptor 0 at position 0
+[Client 1]: Verifying cache for client at address 127.0.0.1:8082
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 0
+[Client 1]: Invalidating cache for file descriptor 0 from position 0 to 512 and size 512
+[Client 1]: Cache miss for file descriptor 0 at position 0
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8082
+[SERVER]: Reading 64 bytes from file 0 at position 0
+[Client 1]: Read message from server: "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean"
+[Client 0]: Writing 64 bytes to file descriptor 0 at position 32
+[SERVER]: Server Received a Write Request with 81 bytes from 127.0.0.1:8081
+[SERVER]: Sending cache invalidation for file 0 from position 32 for 64 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[Client 0]: Successfully wrote to file descriptor 0
+[Client 1]: Reading 64 bytes from file descriptor 0 at position 0
+[Client 1]: Verifying cache for client at address 127.0.0.1:8082
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 32
+[Client 1]: Invalidating cache for file descriptor 0 from position 32 to 96 and size 64
+[Client 1]: Cache miss for file descriptor 0 at position 0
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8082
+[SERVER]: Reading 64 bytes from file 0 at position 0
+[Client 1]: Read message from server: "Lorem ipsum dolor sit amet, cons00000000000000000000000000000000"
+[Client 1]: Reading 64 bytes from file descriptor 0 at position 32
+[Client 1]: Verifying cache for client at address 127.0.0.1:8082
+[Client 1]: Cache miss for file descriptor 0 at position 32
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8082
+[SERVER]: Reading 64 bytes from file 0 at position 32
+[Client 1]: Read message from server: "0000000000000000000000000000000000000000000000000000000000000000"
+[Client 0]: Closing file descriptor 0
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8081
+[Client 0]: Successfully closed file descriptor 0
+[Client 1]: Closing file descriptor 0
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8082
+[Client 1]: Successfully closed file descriptor 0
+Test 5 completed successfully.

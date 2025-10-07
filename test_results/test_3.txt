@@ -1,0 +1,333 @@
+Starting Test 3: Concurrent writes and reads test.
+Creating agent 0 on address 127.0.0.1:8081
+Creating agent 1 on address 127.0.0.1:8082
+Creating agent 2 on address 127.0.0.1:8083
+Creating agent 3 on address 127.0.0.1:8084
+Creating agent 4 on address 127.0.0.1:8085
+Agent 0 opening file file.txt
+[Client 0]: Opening file file.txt with descriptor 0
+Agent 3 opening file file.txt
+[Client 3]: Opening file file.txt with descriptor 0
+Agent 1 opening file file.txt
+[Client 1]: Opening file file.txt with descriptor 0
+Agent 2 opening file file.txt
+[Client 2Agent 4 opening file file.txt
+]: Opening file file.txt with descriptor 0
+[Client 4]: Opening file file.txt with descriptor 0
+[SERVER]: Server Received a Open Request with 25 bytes from 127.0.0.1:8081
+[SERVER]: Server Received a Open Request with 25 bytes from 127.0.0.1:8084
+[SERVER]: Server Received a Open Request with 25 bytes from 127.0.0.1:8082
+[SERVER]: Server Received a Open Request with 25 bytes from 127.0.0.1:8085
+[Client 0]: Successfully opened file with descriptor 0
+Agent 0 opened file file.txt
+Agent 0 writing Hello from agent 0
+[SERVER]: Server Received a Open Request with  to file file.txt
+25 bytes from 127.0.0.1:8083
+[Client 3]: Successfully opened file with descriptor 0
+Agent 3 opened file file.txt
+[Client Agent 3 writing Hello from agent 3
+4 to file file.txt
+]: Successfully opened file with descriptor 0
+Agent 4 opened file file.txt
+[Client Agent 4 writing Hello from agent 4
+2 to file file.txt
+]: Successfully opened file with descriptor 0
+Agent 2 opened file file.txt
+Agent 2 writing Hello from agent 2
+[Client  to file file.txt
+1]: Successfully opened file with descriptor 0
+Agent 1 opened file file.txt
+Agent 1 writing Hello from agent 1
+[Client  to file file.txt
+3]: Writing 19 bytes to file descriptor 0 at position 0
+[Client 0]: Writing 19 bytes to file descriptor 0 at position 0
+[Client 4]: Writing 19 bytes to file descriptor 0 at position 0
+[Client 2]: Writing 19 bytes to file descriptor 0 at position 0
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8084
+[Client 1]: Writing 19 bytes to file descriptor 0 at position 0
+[SERVER]: Sending cache invalidation for file 0 from position 0 for 19 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8081
+[Client 3]: Successfully wrote to file descriptor 0
+[SERVER]: Sending cache invalidation for file Agent 3 wrote Hello from agent 3
+0 to file file.txt
+ from position 0 for 19 bytes
+[Client 3]: Writing 19 bytes to file descriptor 0 at position 19
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8085
+[Client 0]: Successfully wrote to file descriptor 0
+Agent 0 wrote Hello from agent 0
+ to file file.txt
+[Client 0]: Writing 19 bytes to file descriptor 0 at position 19
+[SERVER]: Sending cache invalidation for file 0 from position 0 for 19 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8083
+[Client 4]: Successfully wrote to file descriptor 0
+Agent 4 wrote Hello from agent 4
+ to file file.txt
+[Client 4]: Writing 19 bytes to file descriptor 0 at position 19
+[SERVER]: Sending cache invalidation for file 0 from position 0 for 19 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8082
+[SERVER]: Sending cache invalidation for file 0 from position 0 for 19 bytes
+[Client 2]: Successfully wrote to file descriptor 0
+[SERVER]: Sent cache invalidation for file Agent 2 wrote Hello from agent 2
+0 to file file.txt
+ to 127.0.0.1:8081 with 21 bytes
+[Client 2]: Writing 19 bytes to file descriptor 0 at position 19
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8084
+[Client 1]: Successfully wrote to file descriptor 0
+[SERVER]: Sending cache invalidation for file Agent 1 wrote Hello from agent 1
+0 to file file.txt
+ from position 19 for 19 bytes
+[Client 1]: Writing 19 bytes to file descriptor 0 at position 19
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8081
+[Client 3]: Successfully wrote to file descriptor 0
+Agent 3 wrote Hello from agent 3
+ to file file.txt
+[SERVER]: Sending cache invalidation for file 0 from position 19 for 19 bytes
+[Client 3]: Reading 128 bytes from file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[Client 3]: Verifying cache for client at address 127.0.0.1:8084
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 0
+[Client 3]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 0
+[Client 3]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 0
+[Client 3]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 0
+[Client 3]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 0
+[Client 3]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 19
+[Client 3]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 3]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 3]: Cache invalidation for file descriptor 0 at position 19
+[Client 3]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 3]: Cache miss for file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8085
+[Client 0]: Successfully wrote to file descriptor 0
+[SERVER]: Sending cache invalidation for file Agent 0 wrote Hello from agent 0
+0 to file file.txt
+ from position 19 for 19 bytes
+[Client 0]: Reading 128 bytes from file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[Client 0]: Verifying cache for client at address 127.0.0.1:8081
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 0
+[Client 0]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 0
+[Client 0]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 0
+[Client 0]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 0
+[Client 0]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 0
+[Client 0]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 19
+[Client 0]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 19
+[Client 0]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 0]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 0]: Cache invalidation for file descriptor 0 at position 19
+[Client 0]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 0]: Cache miss for file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8083
+[Client 4]: Successfully wrote to file descriptor 0
+[SERVER]: Sending cache invalidation for file Agent 4 wrote Hello from agent 4
+0 to file file.txt
+ from position 19 for 19 bytes
+[Client 4]: Reading 128 bytes from file descriptor 0 at position 0
+[Client 4]: Verifying cache for client at address 127.0.0.1:8085
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 0
+[Client 4]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 0
+[Client 4]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 0
+[Client 4]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 0
+[Client 4]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 0
+[Client 4]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 19
+[Client 4]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 19
+[Client 4]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 4]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 4]: Cache invalidation for file descriptor 0 at position 19
+[Client 4]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 4]: Cache miss for file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Write Request with 36 bytes from 127.0.0.1:8082
+[Client 2]: Successfully wrote to file descriptor 0
+Agent 2 wrote Hello from agent 2
+ to file file.txt
+[SERVER]: Sending cache invalidation for file 0 from position 19 for 19 bytes
+[Client 2]: Reading 128 bytes from file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8081 with 21 bytes
+[Client 2]: Verifying cache for client at address 127.0.0.1:8083
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 0
+[Client 2]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 0
+[Client 2]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 0
+[Client 2]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 0
+[Client 2]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 0
+[Client 2]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 19
+[Client 2]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 19
+[Client 2]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 19
+[Client 2]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 2]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 2]: Cache invalidation for file descriptor 0 at position 19
+[Client 2]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 2]: Cache miss for file descriptor 0 at position 0
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8084 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8082 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8085 with 21 bytes
+[SERVER]: Sent cache invalidation for file 0 to 127.0.0.1:8083 with 21 bytes
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8084
+[SERVER]: Reading 128 bytes from file 0 at position 0
+[Client 1]: Successfully wrote to file descriptor 0
+Agent 1 wrote Hello from agent 1
+ to file file.txt
+[Client 1]: Reading 128 bytes from file descriptor 0 at position 0
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8081
+[SERVER]: Reading 128 bytes from file 0 at position 0
+[Client 3]: Read message from server: "Hello from agent 1\nHello from agent 1\nt 0\n000000000000000000000000000000000000000000000000000000an massa. Cum sociis natoque pen"
+Error: Agent 3 failed to read from file file.txt: 128
+[Client 1]: Verifying cache for client at address 127.0.0.1:8082
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 0
+[Client 1]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 0
+[Client 1]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 0
+[Client 1]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 0
+[Client 1]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 0
+[Client 1]: Invalidating cache for file descriptor 0 from position 0 to 19 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 19
+[Client 1]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8085
+[SERVER]: Reading 128 bytes from file 0 at position 0
+[Client 0]: Read message from server: "Hello from agent 1\nHello from agent 1\nt 0\n000000000000000000000000000000000000000000000000000000an massa. Cum sociis natoque pen"
+[Client Error: Agent 0 failed to read from file file.txt: 128
+1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 19
+[Client 1]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 19
+[Client 1]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 19
+[Client 1]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 1]: Received warning on cache listener, 21 bytes from 127.0.0.1:8080
+[Client 1]: Cache invalidation for file descriptor 0 at position 19
+[Client 1]: Invalidating cache for file descriptor 0 from position 19 to 38 and size 19
+[Client 1]: Cache miss for file descriptor 0 at position 0
+[Client 3]: Closing file descriptor 0
+[Client 0]: Closing file descriptor 0
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8083
+[SERVER]: Reading 128 bytes from file 0 at position 0
+[Client 4]: Read message from server: "Hello from agent 1\nHello from agent 1\nt 0\n000000000000000000000000000000000000000000000000000000an massa. Cum sociis natoque pen"
+Error: Agent 4 failed to read from file file.txt: 128
+[Client 4]: Closing file descriptor 0
+[Client 2]: Read message from server: "Hello from agent 1\nHello from agent 1\nt 0\n000000000000000000000000000000000000000000000000000000an massa. Cum sociis natoque pen"
+Error: Agent 2 failed to read from file file.txt: 128
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8084
+[Client 2]: Closing file descriptor 0
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8081
+[Client 3]: Successfully closed file descriptor 0
+Agent 3 closed file file.txt
+[SERVER]: Server Received a Read Request with 17 bytes from 127.0.0.1:8082
+[Client 0]: Successfully closed file descriptor 0
+Agent 0 closed file file.txt
+[SERVER]: Reading 128 bytes from file 0 at position 0
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8085
+[Client 1]: Read message from server: "Hello from agent 1\nHello from agent 1\nt 0\n000000000000000000000000000000000000000000000000000000an massa. Cum sociis natoque pen"
+Error: Agent 1 failed to read from file file.txt: 128
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8083
+[Client 4]: Successfully closed file descriptor 0
+Agent 4 closed file file.txt
+[Client 1]: Closing file descriptor 0
+[Client 2]: Successfully closed file descriptor 0
+Agent 2 closed file file.txt
+[SERVER]: Server Received a Close Request with 17 bytes from 127.0.0.1:8082
+[Client 1]: Successfully closed file descriptor 0
+Agent 1 closed file file.txt
+Test 3 completed successfully with 5 agents.
