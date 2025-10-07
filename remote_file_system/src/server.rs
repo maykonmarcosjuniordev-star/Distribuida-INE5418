@@ -236,7 +236,7 @@ impl Server {
                             // reset the counter
                             entry.number_of_requests = 1;
                             entry.first_request = start_time.elapsed();
-                        } else if entry.number_of_requests > 5 {
+                        } else if entry.number_of_requests > 50 {
                             println!("Throttling client {}: too many requests", current_client);
                             let response = self.response_factory.create_error_response(-1);
                             Self::send(response, &mut stream);

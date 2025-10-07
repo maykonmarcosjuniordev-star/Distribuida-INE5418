@@ -237,9 +237,60 @@ fn run_tests() {
 
 }
 
+fn is_number(s: &str) -> bool {
+    s.parse::<i32>().is_ok()
+}
+
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    println!("Args len: {}", args.len());
+    if args.len() == 1 {
+        run_tests();
+    } else {
+        run_manually();
+    }
     // simple_test();
-    run_tests();
+}
+
+fn run_manually() {
+    let server_a = Server::new("127.0.0.1", 8080);
+    let server_addr = server_a.get_address();
+    
+    let args: Vec<String> = std::env::args().collect();
+    let mut agents_handles = vec![];
+    let mut server_handles = vec![];
+    for arg in &args {
+        println!("Arg: {}", arg);
+        if arg == "server" {
+            let server = Server::new("127.0.0.1", 8080);
+            let server_handle = {
+                thread::spawn(move || {
+                    server.run();
+                })
+            };
+            server_handles.push(server_handle);
+            break;
+        }
+
+        if is_number(arg) {
+            let id: u32 = arg.parse().unwrap();
+            let addr = format!("127.0.0.1:{}", 8081 + id).parse().expect("Failed to parse agent address");
+            println!("Creating agent {} on address {}", id, addr);
+            let agent = Agent::new(id, &server_addr, addr);
+            let handle = thread::spawn(move || {
+                agent.run();
+            });
+            agents_handles.push(handle);
+            break;
+        }
+    }
+
+    for handle in agents_handles {
+        handle.join().expect("Failed to join agent thread");
+    }
+    for handle in server_handles {
+        handle.join().expect("Failed to join server thread");
+    }
 }
 
 fn simple_test() {
