@@ -38,9 +38,10 @@ public:
             }
             printf("Agent %i reading from file %i\n", id, id_file);
             buffer.clear();
-            if (cliente.le(id_file, 0, buffer, buffer.size()) >= 0) {
+            if (int bytes = cliente.le(id_file, 0, buffer, 50) >= 0) {
                 string readed(buffer.begin(), buffer.end());
-                printf("Agent %i read %i bytes from file %i: %s\n", id, readed.size(), id_file, readed.c_str());
+                printf("Agent %i read %i bytes from file %i: \n", id, bytes, id_file);
+                cout << "Read: " << readed << endl;
             } else {
                 printf("Error, couldn't read file.\n");
                 continue;

@@ -105,7 +105,21 @@ public:
         buffer.resize(BUFFER_SIZE);
 
         printf("Waiting for response from server...\n");
-        read(sock, buffer.data(), BUFFER_SIZE);
+        int Nbytes = read(sock, buffer.data(), BUFFER_SIZE);
+
+        if (Nbytes > 0) {
+            buffer.resize(Nbytes);
+        }
+        
+        // int ind = 0;
+        // for (char c : buffer) {
+        //     cout << c << endl;
+        //     ind++;
+        //     if (ind >= Nbytes) {
+        //         break;
+        //     }
+        // }
+        // cout << "Finalizado\n";
         close(sock);
         printf("Response received from server.\n");
 
@@ -171,6 +185,7 @@ public:
     }
 
     int le(int descritor_arquivo, unsigned long long posicao, vector<char> &buffer, unsigned int tamanho) {
+        buffer.clear();
         for (auto item : cache) {
             if (item.descritor_arquivo == descritor_arquivo and item.start <= posicao and posicao+tamanho <= item.end) {
                 int cacheStatus = verify_cache(item);
@@ -190,7 +205,7 @@ public:
         rqst.request_type = RequestType::LE;
         rqst.descritor_arquivo = descritor_arquivo;
         rqst.posicao = posicao;
-        rqst.size = 0;
+        rqst.size = tamanho;
         rqst.data = {};
 
         int result = sendServer(buffer, rqst);
@@ -200,6 +215,7 @@ public:
         }
 
         Response rsp = desserialize(buffer);
+        // cout << rsp.data.size() << ""
         // for (auto byte : rsp.data) {
         //     printf("%u ", static_cast<uint8_t>(byte));
         // }
@@ -216,7 +232,7 @@ public:
             if (cache.size() > MAX_CACHE_SIZE) {
                 cache.erase(cache.begin());
             }
-            return tamanho;
+            return rsp.data.size();
         } else { // ERROR
             return -1;
         }
