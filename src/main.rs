@@ -178,7 +178,7 @@ fn test_4(server_addr: &std::net::SocketAddr) {
 }
 
 fn test_5(server_addr: &std::net::SocketAddr) {
-    println!("Starting Test 4: Large write and read test with cache coherence and overlap.");
+    println!("Starting Test 5: Large write and read test with cache coherence and overlap.");
     let agents = create_agents(2, server_addr);
 
     let agent0 = &agents[0];
@@ -217,6 +217,7 @@ fn test_5(server_addr: &std::net::SocketAddr) {
 }
 
 fn run_tests() {
+    println!("Running automated tests");
     let server = Server::new("127.0.0.1", 8080);
     let server_addr = server.get_address();
     let server_handle = {
@@ -253,6 +254,7 @@ fn main() {
 }
 
 fn run_manually() {
+    println!("Running manually");
     let server_a = Server::new("127.0.0.1", 8080);
     let server_addr = server_a.get_address();
     
@@ -278,7 +280,7 @@ fn run_manually() {
             println!("Creating agent {} on address {}", id, addr);
             let agent = Agent::new(id, &server_addr, addr);
             let handle = thread::spawn(move || {
-                agent.run();
+                agent.run_manually();
             });
             agents_handles.push(handle);
             break;
