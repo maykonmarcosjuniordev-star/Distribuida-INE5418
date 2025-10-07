@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 
-use remote_file_system::client::Client;
+use remote_file_system::client::{Client};
 
 pub struct Agent {
     client: Client,
@@ -10,8 +10,29 @@ pub struct Agent {
 
 impl Agent {
     pub fn new(id: u32, server_addr: &SocketAddr, addr: SocketAddr) -> Self {
-        let client = Client::new(*server_addr, addr);
+        let client = Client::new(*server_addr, addr, id);
         Self {client, id}
+    }
+
+    pub fn get_id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn abre(&self, descritor_arquivo: i32, nome_arquivo: String) -> i32 {
+        return self.client.abre(descritor_arquivo, nome_arquivo)
+    }
+
+    pub fn le(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
+        return self.client.le(descritor_arquivo, posicao, buffer, tamanho)
+    }
+
+    pub fn escreve(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
+        return self.client.escreve(descritor_arquivo, posicao, buffer, tamanho)
+    }
+
+    pub fn fecha(&self, descritor_arquivo: i32) -> i32 {
+        self.id;
+        return self.client.fecha(descritor_arquivo)
     }
 
     pub fn run(&self) {

@@ -20,6 +20,23 @@ pub struct Server {
     file_watchers: Mutex<HashMap<i32, Vec<SocketAddr>>>,
     response_factory: StandardResponseFactory,
     throttle: Mutex<HashMap<SocketAddr, RateLimiter>>,
+
+}
+
+#[macro_export]
+macro_rules! server_log {
+    // Rule for the case where arguments are provided (e.g., simple_log!("Error: {}", e))
+    ($fmt:literal $(, $args:expr)*) => {
+        eprintln!(
+            // Combine the fixed prefix and the user's format string
+            concat!("[SERVER]: ", $fmt), 
+            $($args),*
+        )
+    };
+    // Rule for the case where NO arguments are provided (e.g., simple_log!("Status ok"))
+    ($fmt:literal) => {
+        eprintln!(concat!("[SERVER]: ", $fmt))
+    };
 }
 
 impl Server {
@@ -56,8 +73,8 @@ impl Server {
             for usr in usrs {
                 let buffer = Response::serialize(&response);
                 match socket.send_to(&buffer, usr) {
-                    Ok(size) => println!("Sent cache invalidation to {}: {} bytes", usr, size),
-                    Err(e) => println!("Failed to send cache invalidation to {}: {}", usr, e),
+                    Ok(size) => server_log!("Sent cache invalidation for file {} to {} with {} bytes", descritor_arquivo, usr, size),
+                    Err(e) => server_log!("Failed to send cache invalidation to {}: {}", usr, e),
                 }
             }
         }
@@ -71,9 +88,10 @@ impl Server {
                 if let Ok(mut usr) = self.file_watchers.lock() {
                     match usr.get_mut(&request.descritor_arquivo) {
                         Some(u) => {
-                            u.push(client
-                                .peer_addr()
-                                .expect("Failed to get client address"));
+                            let client_address = client.peer_addr().expect("Failed to get client address");
+                            if !u.contains(&client_address) {
+                                u.push(client_address);
+                            }
                         },
                         None => {
                             usr
@@ -86,7 +104,7 @@ impl Server {
                 }
             },
             i => {
-                println!("Server failed to open file {} of name {}: Error {}", request.descritor_arquivo, nome_arquivo, i);
+                server_log!("Server failed to open file {} of name {}: Error {}", request.descritor_arquivo, nome_arquivo, i);
                 let response = self.response_factory.create_error_response(-1);
                 Self::send(response, client);
             },
@@ -99,7 +117,7 @@ impl Server {
             if let Some(usrs) = watchers.get(&request.descritor_arquivo) {
                 let addr = client.peer_addr().expect("Failed to get client address");
                 if !usrs.contains(&addr) {
-                    println!("Client {} is not watching file {}", addr, request.descritor_arquivo);
+                    server_log!("Client {} is not watching file {}", addr, request.descritor_arquivo);
                     let response = self.response_factory.create_error_response(-1);
                     Self::send(response, client);
                     return false;
@@ -117,7 +135,7 @@ impl Server {
         let mut buffer: Vec<u8> = vec![0; BUFFER_SIZE];
         match self.files.le(request.descritor_arquivo, request.posicao, &mut buffer, request.tamanho as usize) {
             -1 => {
-                println!("Server failed to read the file {}: Error {}", request.descritor_arquivo, -1);
+                server_log!("Server failed to read the file {}: Error {}", request.descritor_arquivo, -1);
                 let response = self.response_factory.create_error_response(-1);
                 Self::send(response, client);
             },
@@ -137,11 +155,12 @@ impl Server {
         let mut buffer = request.data;
         match self.files.escreve(request.descritor_arquivo, request.posicao, &mut buffer, request.tamanho as usize) {
             -1 => {
-                println!("Server failed to write the file {}", request.descritor_arquivo);
+                server_log!("Server failed to write the file {}", request.descritor_arquivo);
                 let response = self.response_factory.create_error_response(-1);
                 Self::send(response, client);
             },
             i => {
+                server_log!("Sending cache invalidation for file {} from position {} for {} bytes", request.descritor_arquivo, request.posicao, request.tamanho);
                 let response = self.response_factory
                     .create_cache_invalidation(request.descritor_arquivo,
                         request.posicao,
@@ -190,7 +209,7 @@ impl Server {
                 }
             },
             i => {
-                println!("Server failed to close file {}: Error {}", request.descritor_arquivo, i);
+                server_log!("Server failed to close file {}: Error {}", request.descritor_arquivo, i);
                 let response = self.response_factory.create_error_response(-1);
                 Self::send(response, client);
             },
@@ -199,7 +218,7 @@ impl Server {
     }
 
     pub fn run(&self) {
-        println!("Server listening on {}", self.address);
+        server_log!("Server listening on {}", self.address);
         let listener = TcpListener::bind(self.address).expect("Failed to bind server address");
         // accept connections and process them serially
         let start_time = Instant::now();
@@ -230,25 +249,25 @@ impl Server {
                     
                     match request.request_type {
                         RequestType::Abre => {
-                            println!("Server Received a Open Request with {} bytes from {}", amt, current_client);
+                            server_log!("Server Received a Open Request with {} bytes from {}", amt, current_client);
                             self.abre(request, &mut stream);
                         },
                         RequestType::Le => {
-                            println!("Server Received a Read Request with {} bytes from {}", amt, current_client);
+                            server_log!("Server Received a Read Request with {} bytes from {}", amt, current_client);
                             self.le(request, &mut stream);
                         },
                         RequestType::Escreve => {
-                            println!("Server Received a Write Request with {} bytes from {}", amt, current_client);
+                            server_log!("Server Received a Write Request with {} bytes from {}", amt, current_client);
                             self.escreve(request, &mut stream);
                         },
                         RequestType::Fecha => {
-                            println!("Server Received a Close Request with {} bytes from {}", amt, current_client);
+                            server_log!("Server Received a Close Request with {} bytes from {}", amt, current_client);
                             self.fecha(request, &mut stream);
                         }
                     };
-                },
+                }
                 Err(e) => {
-                    println!("Error Receiving Connections: {}", e);
+                    server_log!("Error Receiving Connections: {}", e);
                 }
             }
         }

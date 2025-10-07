@@ -2,6 +2,7 @@ use std::fs::{File, OpenOptions};
 use std::collections::HashMap;
 use std::os::unix::fs::FileExt;
 use std::sync::Mutex;
+use crate::server_log;
 
 const FILES_PATH: &str = "./files/";
 
@@ -13,7 +14,7 @@ impl FileManager {
     pub fn new() -> Self {
         // Ensure the files directory exists
         if let Err(e) = std::fs::create_dir_all(FILES_PATH) {
-            println!("Warning: Could not create files directory on {}: {}", FILES_PATH, e);
+            server_log!("Warning: Could not create files directory on {}: {}", FILES_PATH, e);
         }
         Self {file_table: Mutex::new(HashMap::new())}
     }
@@ -43,7 +44,7 @@ impl FileManager {
         .open(file_path) {
             Ok(f) => f,
             Err(e) => {
-                println!("Erro {} ao abrir arquivo: {}", e, nome_arquivo);
+                server_log!("Erro {} ao abrir arquivo: {}", e, nome_arquivo);
                 return -1;
             },
         };
@@ -64,12 +65,13 @@ impl FileManager {
     pub fn le(&self, descritor_arquivo: i32, posicao: u64, buffer: &mut Vec<u8>, tamanho: usize) -> i32 {
         match self.file_table.lock().expect("Failed to lock file table").get(&descritor_arquivo) {
             Some(file) => {
+                server_log!("Reading {} bytes from file {} at position {}", tamanho, descritor_arquivo, posicao);
                 match  file.read_at(buffer[..tamanho].as_mut(), posicao) {
                     Ok(size) => {
                         size as i32
                     }
                     Err(e) => {
-                        println!("Erro ao ler arquivo {}: {}", descritor_arquivo, e);
+                        server_log!("Erro ao ler arquivo {}: {}", descritor_arquivo, e);
                         -1
                     }
                 }
@@ -101,7 +103,7 @@ impl FileManager {
                         buffer.len() as i32
                     }
                     Err(e) => {
-                        println!("Erro {} ao abrir arquivo: {}", e, descritor_arquivo);
+                        server_log!("Erro {} ao abrir arquivo: {}", e, descritor_arquivo);
                         -1
                     }
                 }
@@ -115,7 +117,7 @@ impl FileManager {
     /// Retorna 0 em caso de sucesso e -1 em caso de erro.
     pub fn fecha(&self, descritor_arquivo: i32) -> i32{
         if !self.file_table.lock().expect("Failed to lock file table").contains_key(&descritor_arquivo) {
-            println!("Arquivo {} não encontrado para fechar", descritor_arquivo);
+            server_log!("Arquivo {} não encontrado para fechar", descritor_arquivo);
             return -1;
         }
         // fecha o arquivo
