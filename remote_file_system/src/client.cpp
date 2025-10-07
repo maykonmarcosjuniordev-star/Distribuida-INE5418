@@ -209,13 +209,12 @@ public:
         rqst.data = {};
 
         int result = sendServer(buffer, rqst);
-
         if (result == -1) {
             return result;
         }
 
         Response rsp = desserialize(buffer);
-        // cout << rsp.data.size() << ""
+        // cout << "Size: " << rsp.data.size() << endl;
         // for (auto byte : rsp.data) {
         //     printf("%u ", static_cast<uint8_t>(byte));
         // }
@@ -332,20 +331,21 @@ public:
         // gets only the first byte of the first char
         uint8_t type = static_cast<uint8_t>(buffer[0]) && 0xFF;
         rsp.response_type = static_cast<ResponseType>(type);
-        for (auto chars : buffer) {
-            int32_t chars_int = static_cast<int32_t>(chars);
-            // break int into 4 bytes
-            uint8_t b0 = static_cast<uint8_t>(chars_int);
-            uint8_t b1 = static_cast<uint8_t>(chars_int >> 8);
-            uint8_t b2 = static_cast<uint8_t>(chars_int >> 16);
-            uint8_t b3 = static_cast<uint8_t>(chars_int >> 24);
-            rsp.data.push_back(static_cast<char>(b0));
-            rsp.data.push_back(static_cast<char>(b1));
-            rsp.data.push_back(static_cast<char>(b2));
-            rsp.data.push_back(static_cast<char>(b3));
-        }
+        buffer.erase(buffer.begin());
+        rsp.data = buffer;
+        // for (auto chars : buffer) {
+        //     int32_t chars_int = static_cast<int32_t>(chars);
+        //     // break int into 4 bytes
+        //     uint8_t b0 = static_cast<uint8_t>(chars_int);
+        //     uint8_t b1 = static_cast<uint8_t>(chars_int >> 8);
+        //     uint8_t b2 = static_cast<uint8_t>(chars_int >> 16);
+        //     uint8_t b3 = static_cast<uint8_t>(chars_int >> 24);
+        //     rsp.data.push_back(static_cast<char>(b0));
+        //     rsp.data.push_back(static_cast<char>(b1));
+        //     rsp.data.push_back(static_cast<char>(b2));
+        //     rsp.data.push_back(static_cast<char>(b3));
+        // }
         // removes the first byte from data
-        rsp.data.erase(rsp.data.begin());
         return rsp;
     }
 
